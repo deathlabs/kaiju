@@ -30,7 +30,7 @@ import (
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "kaiju",
-	Short: "kaiju helps teams create and manage tabletop exercises.",
+	Short: "Create and conduct tabletop exercises.",
 	Long:  ``,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:

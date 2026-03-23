@@ -1,4 +1,4 @@
 #!/bin/sh
 
 set -e
-kaiju serve --port 8001
+kaiju start --port 8001

@@ -52,10 +52,10 @@ func getAPI() *echo.Echo {
 	)
 
 	api = echo.New()
+	api.Use(middleware.RequestLogger())
 	api.Renderer = &Templates{
 		templates: template.Must(template.ParseGlob("templates/*.html")),
 	}
-	api.Use(middleware.RequestLogger())
 
 	api.GET("/", getIndex)
 	routes = api.Group("/api/v1")
@@ -96,18 +96,18 @@ func run(cmd *cobra.Command, args []string) {
 	api = getAPI()
 	err = api.Start(fmt.Sprintf(":%d", port))
 	if err != nil {
-		api.Logger.Error("failed to start server", "error", err)
+		api.Logger.Error("failed to start", "error", err)
 	}
 }
 
-var serveCmd = &cobra.Command{
-	Use:   "serve",
-	Short: "Start the kaiju server.",
+var startCmd = &cobra.Command{
+	Use:   "start",
+	Short: "Start kaiju.",
 	Long:  "",
 	Run:   run,
 }
 
 func init() {
-	rootCmd.AddCommand(serveCmd)
-	serveCmd.Flags().Int("port", 8001, "Port to serve from")
+	rootCmd.AddCommand(startCmd)
+	startCmd.Flags().Int("port", 8001, "Port to serve from")
 }
