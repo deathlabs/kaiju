@@ -16,5 +16,4 @@ RUN adduser -D kaiju -h /home/kaiju &&\
     chmod +x /usr/local/bin/kaiju
 USER kaiju
 EXPOSE 8001
-ENTRYPOINT [ "./entrypoint.sh" ]
- 
+ENTRYPOINT [ "kaiju", "start", "--port", "8001" ]

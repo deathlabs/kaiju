@@ -103,7 +103,6 @@ func run(cmd *cobra.Command, args []string) {
 var startCmd = &cobra.Command{
 	Use:   "start",
 	Short: "Start kaiju.",
-	Long:  "",
 	Run:   run,
 }
 
