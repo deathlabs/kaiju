@@ -8,10 +8,6 @@
 # Tell Docker to build images in parallel.
 COMPOSE_BAKE := true
 
-# Set the environment variables file to ".env" if an argument is not provided.
-ENV_FILE ?= .env
-include $(ENV_FILE)
-
 # Set the Docker Compose profile to "all" if an argument is not provided.
 DOCKER_COMPOSE_PROFILE ?= all
 
@@ -23,7 +19,7 @@ DOCKER_COMPOSE_PROFILE ?= all
 .SILENT: build
 
 build: 
-	docker compose --profile $(DOCKER_COMPOSE_PROFILE) --env-file $(ENV_FILE) build --no-cache 
+	docker compose --profile $(DOCKER_COMPOSE_PROFILE) build
 
 # ---------------------------------------------------------
 # Start the containers.
@@ -33,7 +29,7 @@ build:
 .SILENT: start
 
 start:
-	docker compose --profile $(DOCKER_COMPOSE_PROFILE) --env-file $(ENV_FILE) up -d
+	docker compose --profile $(DOCKER_COMPOSE_PROFILE) up -d
 
 # ---------------------------------------------------------
 # Stop the containers.
@@ -43,4 +39,4 @@ start:
 .SILENT: stop
 
 stop: 
-	docker compose --profile $(DOCKER_COMPOSE_PROFILE) --env-file $(ENV_FILE) down
+	docker compose --profile $(DOCKER_COMPOSE_PROFILE) down

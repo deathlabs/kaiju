@@ -45,26 +45,6 @@ func getIndex(context *echo.Context) error {
 	return context.Render(http.StatusOK, "index.html", nil)
 }
 
-func getAPI() *echo.Echo {
-	var (
-		api    *echo.Echo
-		routes *echo.Group
-	)
-
-	api = echo.New()
-	api.Use(middleware.RequestLogger())
-	api.Renderer = &Templates{
-		templates: template.Must(template.ParseGlob("templates/*.html")),
-	}
-
-	api.GET("/", getIndex)
-	routes = api.Group("/api/v1")
-	routes.GET("/injects/:id", getInject)
-	routes.GET("/tabletopexercises/:id", getTableTopExercise)
-
-	return api
-}
-
 func getInject(context *echo.Context) error {
 	var inject *types.Inject
 	inject = &types.Inject{ID: context.Param("id")}
@@ -76,12 +56,32 @@ func getTableTopExercise(context *echo.Context) error {
 	ttx = &types.TableTopExercise{ID: context.Param("id")}
 
 	if context.Request().Header.Get("HX-Request") == "true" {
-		return context.Render(http.StatusOK, "index.html", ttx)
+		return context.Render(http.StatusOK, "ttx.html", ttx)
 	}
 	return context.JSON(http.StatusOK, ttx)
 }
 
-func run(cmd *cobra.Command, args []string) {
+func getServer() *echo.Echo {
+	var (
+		server *echo.Echo
+		api *echo.Group
+	)
+
+	server = echo.New()
+	server.Use(middleware.RequestLogger())
+	server.Renderer = &Templates{
+		templates: template.Must(template.ParseGlob("templates/*.html")),
+	}
+	server.GET("/", getIndex)
+
+	api = server.Group("/api/v1")
+	api.GET("/injects/:id", getInject)
+	api.GET("/tabletopexercises/:id", getTableTopExercise)
+
+	return server
+}
+
+func startServer(cmd *cobra.Command, args []string) {
 	var (
 		api  *echo.Echo
 		err  error
@@ -93,7 +93,7 @@ func run(cmd *cobra.Command, args []string) {
 		api.Logger.Error("failed to parse port argument", "error", err)
 	}
 
-	api = getAPI()
+	api = getServer()
 	err = api.Start(fmt.Sprintf(":%d", port))
 	if err != nil {
 		api.Logger.Error("failed to start", "error", err)
@@ -103,7 +103,7 @@ func run(cmd *cobra.Command, args []string) {
 var startCmd = &cobra.Command{
 	Use:   "start",
 	Short: "Start kaiju.",
-	Run:   run,
+	Run:   startServer,
 }
 
 func init() {
