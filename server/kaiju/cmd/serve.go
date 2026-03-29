@@ -24,7 +24,6 @@ package cmd
 import (
 	"fmt"
 	"html/template"
-	"io"
 	"net/http"
 
 	"github.com/deathlabs/kaiju/types"
@@ -33,44 +32,44 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type Templates struct {
-	templates *template.Template
-}
-
-func (t *Templates) Render(context *echo.Context, w io.Writer, name string, data interface{}) error {
-	return t.templates.ExecuteTemplate(w, name, data)
-}
-
 func getIndex(context *echo.Context) error {
+	if context.Request().Header.Get("Accept") == "application/json" {
+		return context.NoContent(http.StatusNotAcceptable)
+	}
+
 	return context.Render(http.StatusOK, "index.html", nil)
 }
 
 func getInject(context *echo.Context) error {
-	var inject *types.Inject
-	inject = &types.Inject{ID: context.Param("id")}
-	return context.JSON(http.StatusOK, inject)
+	var inject *types.Inject = &types.Inject{ID: context.Param("id")}
+
+	if context.Request().Header.Get("Accept") == "application/json" {
+		return context.JSON(http.StatusOK, inject)
+	}
+
+	return context.Render(http.StatusOK, "inject.html", inject)
 }
 
 func getTableTopExercise(context *echo.Context) error {
-	var ttx *types.TableTopExercise
-	ttx = &types.TableTopExercise{ID: context.Param("id")}
+	var ttx *types.TableTopExercise = &types.TableTopExercise{ID: context.Param("id")}
 
-	if context.Request().Header.Get("HX-Request") == "true" {
-		return context.Render(http.StatusOK, "ttx.html", ttx)
+	if context.Request().Header.Get("Accept") == "application/json" {
+		return context.JSON(http.StatusOK, ttx)
 	}
-	return context.JSON(http.StatusOK, ttx)
+
+	return context.Render(http.StatusOK, "tabletop-exercise.html", ttx)
 }
 
 func getServer() *echo.Echo {
 	var (
 		server *echo.Echo
-		api *echo.Group
+		api    *echo.Group
 	)
 
 	server = echo.New()
 	server.Use(middleware.RequestLogger())
-	server.Renderer = &Templates{
-		templates: template.Must(template.ParseGlob("templates/*.html")),
+	server.Renderer = &types.TemplateRenderer{
+		Templates: template.Must(template.ParseGlob("templates/*.html")),
 	}
 	server.GET("/", getIndex)
 
@@ -83,26 +82,26 @@ func getServer() *echo.Echo {
 
 func startServer(cmd *cobra.Command, args []string) {
 	var (
-		api  *echo.Echo
-		err  error
-		port int
+		err    error
+		port   int
+		server *echo.Echo
 	)
 
 	port, err = cmd.Flags().GetInt("port")
 	if err != nil {
-		api.Logger.Error("failed to parse port argument", "error", err)
+		server.Logger.Error("failed to parse port argument", "error", err)
 	}
 
-	api = getServer()
-	err = api.Start(fmt.Sprintf(":%d", port))
+	server = getServer()
+	err = server.Start(fmt.Sprintf(":%d", port))
 	if err != nil {
-		api.Logger.Error("failed to start", "error", err)
+		server.Logger.Error("failed to start", "error", err)
 	}
 }
 
 var startCmd = &cobra.Command{
 	Use:   "start",
-	Short: "Start kaiju.",
+	Short: "Start kaiju",
 	Run:   startServer,
 }
 

@@ -8,14 +8,11 @@
 </head>
 <body>
     <h1>Tabletop Exercises</h1>
-
-    <div id="ttx-list">
-        <button hx-get="/api/v1/tabletopexercises/1" hx-target="#ttx-detail" hx-swap="innerHTML">
-            Load TTX #1
+    <div id="tabletop-exercises">
+        <button hx-get="/api/v1/tabletopexercises/1" hx-target="#tabletop-exercises-detailed" hx-swap="innerHTML">
+            Load Tabletop Exericses
         </button>
     </div>
-
-    <div id="ttx-detail">
-    </div>
+    <div id="tabletop-exercises-detailed"></div>
 </body>
 </html>

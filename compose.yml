@@ -1,9 +1,9 @@
 services:
 
-  backend:
-    profiles: [ all, backend ]
-    build: backend
-    image: kaiju/backend:latest
-    container_name: kaiju-backend
+  server:
+    profiles: [ all, server ]
+    build: server
+    image: kaiju/server:latest
+    container_name: kaiju-server
     ports:
       - "8001:8001"
