@@ -22,6 +22,7 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -41,13 +42,60 @@ func getIndex(context *echo.Context) error {
 }
 
 func getInject(context *echo.Context) error {
-	var inject *types.Inject = &types.Inject{ID: context.Param("id")}
+	var (
+		err    error
+		inject *types.Inject
+		store  types.InjectStore
+	)
 
+	store = context.Get(storeKey).(types.InjectStore)
+	inject, err = store.Get(context.Param("id"))
+	if errors.Is(err, errors.New("inject not found")) {
+		return context.JSON(http.StatusNotFound, map[string]string{"error": "inject not found"})
+	}
+	if err != nil {
+		return context.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
 	if context.Request().Header.Get("Accept") == "application/json" {
 		return context.JSON(http.StatusOK, inject)
 	}
-
 	return context.Render(http.StatusOK, "inject.html", inject)
+}
+
+func getInjects(context *echo.Context) error {
+	var (
+		err     error
+		injects []*types.Inject
+		store   types.InjectStore
+	)
+
+	store = context.Get(storeKey).(types.InjectStore)
+	injects, err = store.List()
+	if err != nil {
+		return context.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+	return context.JSON(http.StatusOK, injects)
+}
+
+func postInject(context *echo.Context) error {
+	var (
+		err    error
+		inject *types.Inject
+		store  types.InjectStore
+	)
+
+	store = context.Get(storeKey).(types.InjectStore)
+	inject = &types.Inject{}
+	if err = context.Bind(inject); err != nil {
+		return context.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+	}
+	if inject.ID == "" {
+		return context.JSON(http.StatusBadRequest, map[string]string{"error": "id is required"})
+	}
+	if err = store.Save(inject); err != nil {
+		return context.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+	return context.JSON(http.StatusCreated, inject)
 }
 
 func getTableTopExercise(context *echo.Context) error {
@@ -60,22 +108,36 @@ func getTableTopExercise(context *echo.Context) error {
 	return context.Render(http.StatusOK, "tabletop-exercise.html", ttx)
 }
 
-func getServer() *echo.Echo {
+func getServer(store types.InjectStore) *echo.Echo {
 	var (
-		server *echo.Echo
-		api    *echo.Group
+		api                       *echo.Group
+		server                    *echo.Echo
+		injectsEndpoint           *echo.Group
+		tableTopExercisesEndpoint *echo.Group
 	)
 
 	server = echo.New()
 	server.Use(middleware.RequestLogger())
+	server.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(context *echo.Context) error {
+			context.Set(storeKey, store)
+			return next(context)
+		}
+	})
 	server.Renderer = &types.TemplateRenderer{
 		Templates: template.Must(template.ParseGlob("templates/*.html")),
 	}
-	server.GET("/", getIndex)
 
+	server.GET("/", getIndex)
 	api = server.Group("/api/v1")
-	api.GET("/injects/:id", getInject)
-	api.GET("/tabletopexercises/:id", getTableTopExercise)
+
+	injectsEndpoint = api.Group("/injects/")
+	injectsEndpoint.GET(":id", getInject)
+	injectsEndpoint.GET("", getInjects)
+	injectsEndpoint.POST("", postInject)
+
+	tableTopExercisesEndpoint = api.Group("/tabletopexercises/")
+	tableTopExercisesEndpoint.GET(":id", getTableTopExercise)
 
 	return server
 }
@@ -85,6 +147,7 @@ func startServer(cmd *cobra.Command, args []string) {
 		err    error
 		port   int
 		server *echo.Echo
+		store  types.InjectStore
 	)
 
 	port, err = cmd.Flags().GetInt("port")
@@ -92,7 +155,8 @@ func startServer(cmd *cobra.Command, args []string) {
 		server.Logger.Error("failed to parse port argument", "error", err)
 	}
 
-	server = getServer()
+	store = types.NewMemoryStore()
+	server = getServer(store)
 	err = server.Start(fmt.Sprintf(":%d", port))
 	if err != nil {
 		server.Logger.Error("failed to start", "error", err)

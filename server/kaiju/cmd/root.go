@@ -27,13 +27,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const storeKey = "store"
+
 var rootCmd = &cobra.Command{
 	Use:   "kaiju",
 	Short: "Create and conduct tabletop exercises.",
 }
 
 func Execute() {
-	err := rootCmd.Execute()
+	var err = rootCmd.Execute()
 	if err != nil {
 		os.Exit(1)
 	}
