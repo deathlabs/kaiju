@@ -19,45 +19,58 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
-package store
+package cmd
 
 import (
-	"errors"
-	"sync"
+	"fmt"
+	"html/template"
+	"os"
+
+	"github.com/deathlabs/kaiju/internal/handlers"
+	"github.com/deathlabs/kaiju/internal/models"
+	"github.com/labstack/echo/v5"
+	"github.com/labstack/echo/v5/middleware"
+	"github.com/spf13/cobra"
 )
 
-type MemoryStore[Type any] struct {
-	mu    sync.RWMutex
-	items map[string]*Type
+var rootCmd = &cobra.Command{
+	Use:   "kaiju",
+	Short: "Kaiju is a tool for creating and conducting tabletop exercises.",
+	Run:   startServer,
 }
 
-func NewMemoryStore[Type any]() *MemoryStore[Type] {
-	return &MemoryStore[Type]{items: make(map[string]*Type)}
-}
+func startServer(cmd *cobra.Command, args []string) {
+	var (
+		err    error
+		port   int
+		server *echo.Echo
+	)
 
-func (s *MemoryStore[Type]) Save(item *Type) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	// need a way to get the ID from item
-	return nil
-}
-
-func (s *MemoryStore[Type]) Get(id string) (*Type, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	item, ok := s.items[id]
-	if !ok {
-		return nil, errors.New("not found")
+	server = echo.New()
+	server.Use(middleware.RequestLogger())
+	server.Renderer = &models.TemplateRenderer{
+		Templates: template.Must(template.ParseGlob("templates/*.html")),
 	}
-	return item, nil
+	server.GET("/", handlers.GetIndex)
+
+	port, err = cmd.Flags().GetInt("port")
+	if err != nil {
+		server.Logger.Error("failed to get port argument", "error", err)
+	}
+
+	err = server.Start(fmt.Sprintf(":%d", port))
+	if err != nil {
+		server.Logger.Error("failed to start", "error", err)
+	}
 }
 
-func (s *MemoryStore[Type]) List() ([]*Type, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	items := make([]*Type, 0, len(s.items))
-	for _, item := range s.items {
-		items = append(items, item)
+func init() {
+	rootCmd.Flags().Int("port", 8001, "Port to serve from")
+}
+
+func Execute() {
+	var err = rootCmd.Execute()
+	if err != nil {
+		os.Exit(1)
 	}
-	return items, nil
 }
