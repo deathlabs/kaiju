@@ -19,26 +19,12 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
-package cmd
+package models
 
-import (
-	"os"
-
-	"github.com/spf13/cobra"
-)
-
-const storeKey = "store"
-
-var rootCmd = &cobra.Command{
-	Use:   "kaiju",
-	Short: "Create and conduct tabletop exercises.",
+type Event struct {
+	ID                string   `json:"id"`
+	Description       string   `json:"description"`
+	ExpectedActions   string   `json:"expected_actions"`
+	RelatedObjectives []string `json:"related_objectives"`
+	Injects           []Inject `json:"injects"`
 }
-
-func Execute() {
-	var err = rootCmd.Execute()
-	if err != nil {
-		os.Exit(1)
-	}
-}
-
-func init() {}
