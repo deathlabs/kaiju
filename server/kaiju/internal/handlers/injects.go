@@ -22,11 +22,9 @@ THE SOFTWARE.
 package handlers
 
 import (
-	"net/http"
-
 	"github.com/labstack/echo/v5"
 )
 
-func GetIndex(context *echo.Context) error {
-	return context.Render(http.StatusOK, "index.html", nil)
-}
+func GetInjects(context *echo.Context) error { return nil }
+
+func PostInjects(context *echo.Context) error { return nil }

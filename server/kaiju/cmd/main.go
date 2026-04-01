@@ -33,11 +33,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var rootCmd = &cobra.Command{
-	Use:   "kaiju",
-	Short: "Kaiju is a tool for creating and conducting tabletop exercises.",
-	Run:   startServer,
-}
+var (
+	databaseType string
+	port         int
+	rootCmd      = &cobra.Command{
+		Use:   "kaiju",
+		Short: "Kaiju is a tool for creating and conducting tabletop exercises.",
+		Run:   startServer,
+	}
+)
 
 func startServer(cmd *cobra.Command, args []string) {
 	var (
@@ -65,7 +69,8 @@ func startServer(cmd *cobra.Command, args []string) {
 }
 
 func init() {
-	rootCmd.Flags().Int("port", 8001, "Port to serve from")
+	rootCmd.Flags().IntVarP(&port, "port", "p", 8001, "Port to serve from")
+	rootCmd.Flags().StringVarP(&databaseType, "database-type", "d", "memory", "Database type to use (memory, SQLite, PostgreSQL)")
 }
 
 func Execute() {
