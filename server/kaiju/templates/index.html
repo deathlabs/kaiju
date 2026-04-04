@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kaiju</title>
+    <script src="https://unpkg.com/htmx.org@2.0.0"></script>
+</head>
+<body>
+    <h1>Kaiju</h1>
+    <div id="tabletop-exercises">
+        <button hx-get="/tabletop-exercises" hx-target="#tabletop-exercises-detailed" hx-swap="innerHTML">
+            Load Tabletop Exericses
+        </button>
+    </div>
+    <div id="tabletop-exercises-detailed"></div>
+</body>
+</html>

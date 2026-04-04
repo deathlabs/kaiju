@@ -1,0 +1,9 @@
+services:
+
+  server:
+    profiles: [ all, server ]
+    build: server
+    image: kaiju/server:latest
+    container_name: kaiju-server
+    ports:
+      - "8001:8001"

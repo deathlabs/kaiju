@@ -1,0 +1,12 @@
+---
+site_name: kaiju
+docs_dir: kaiju
+theme:
+  name: null
+extra_css:
+  - css/theme.css
+nav:
+  - "Getting Started": user-guide/getting-started.md
+  - "Architecture": developer-guide/architecture.md
+  - "Data Flow": developer-guide/data-flow.md
+  - "Design Principles": developer-guide/design-principles.md
