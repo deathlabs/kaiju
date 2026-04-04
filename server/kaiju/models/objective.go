@@ -21,17 +21,7 @@ THE SOFTWARE.
 */
 package models
 
-import (
-	"html/template"
-	"io"
-
-	"github.com/labstack/echo/v5"
-)
-
-type TemplateRenderer struct {
-	Templates *template.Template
-}
-
-func (templateRenderer *TemplateRenderer) Render(context *echo.Context, w io.Writer, name string, data any) error {
-	return templateRenderer.Templates.ExecuteTemplate(w, name, data)
+type Objective struct {
+	ID          int    `json:"id" gorm:"primaryKey"`
+	Description string `json:"description" validate:"required"`
 }

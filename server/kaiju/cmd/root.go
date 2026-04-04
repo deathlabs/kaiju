@@ -19,12 +19,34 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
-package handlers
+package cmd
 
 import (
-	"github.com/labstack/echo/v5"
+	"fmt"
+	"os"
+
+	"github.com/spf13/cobra"
 )
 
-func GetInjects(context *echo.Context) error { return nil }
+var (
+	databaseType string
+	port         int
+	rootCmd      = &cobra.Command{
+		Use:   "kaiju",
+		Short: "Kaiju is a tool for creating and conducting tabletop exercises.",
+		RunE:  startServer,
+	}
+)
 
-func PostInjects(context *echo.Context) error { return nil }
+func init() {
+	rootCmd.Flags().IntVarP(&port, "port", "p", 8001, "Port to serve from")
+	rootCmd.Flags().StringVarP(&databaseType, "database-type", "d", "memory", "Database type to use (memory, SQLite, PostgreSQL)")
+}
+
+func Execute() {
+	var err = rootCmd.Execute()
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+}
