@@ -1,2 +1,2 @@
-# User Guide
+# Kaiju
 Text goes here.
