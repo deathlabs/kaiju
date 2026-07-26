@@ -1,9 +1,57 @@
 services:
 
-  server:
-    profiles: [ all, server ]
-    build: server
-    image: kaiju/server:latest
-    container_name: kaiju-server
+  database:
+    profiles: [ all, inference, backend, database ]
+    build: database
+    image: kaiju/database:latest
+    container_name: kaiju-database
+    ports:
+      - "5432:5432"
+    volumes:
+      - kaiju_database:/var/lib/postgresql/data
+    env_file:
+      - database/.env
+
+  docs:
+    profiles: [ docs ]
+    build: docs
+    image: kaiju/docs:latest
+    container_name: kaiju-docs
+    ports:
+      - "5050:5050"
+
+  backend:
+    profiles: [ all, inference, backend ]
+    build: backend
+    image: kaiju/backend:latest
+    container_name: kaiju-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - backend/.env
+
+  inference:
+    profiles: [ all, inference ]
+    build: inference
+    image: kaiju/inference:latest
+    container_name: kaiju-inference
     ports:
       - "8001:8001"
+    env_file:
+      - inference/.env
+
+  frontend:
+    profiles: [ all, frontend ]
+    build:
+      context: frontend
+      args:
+        LANGGRAPH_DEPLOYMENT_URL: "http://kaiju-inference:8001"
+    image: kaiju/frontend:latest
+    container_name: kaiju-frontend
+    ports:
+      - "80:3000"
+    env_file:
+      - frontend/.env
+
+volumes:
+  kaiju_database:
