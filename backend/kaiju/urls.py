@@ -3,9 +3,12 @@ from django.contrib import admin
 from django.urls import path
 
 # Local imports.
+from health.api import api as health_api
 from exercises.api import api as exercises_api
+
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/v1/exercises/", exercises_api.urls),
+    path("api/v1/health/", health_api.urls),
 ]

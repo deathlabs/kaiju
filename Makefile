@@ -40,3 +40,12 @@ start:
 
 stop: 
 	docker compose --profile $(DOCKER_COMPOSE_PROFILE) down
+
+# ---------------------------------------------------------
+# Check the status of the containers.
+# ---------------------------------------------------------
+.PHONY: status
+.SILENT: status
+
+status:
+	docker compose --profile $(DOCKER_COMPOSE_PROFILE) ps --format "table {{.Name}}\t{{.Ports}}\t{{.Status}}"

@@ -26,7 +26,7 @@ SECRET_KEY = environ["SECRET_KEY"]
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["localhost", "kaiju-backend"]
+ALLOWED_HOSTS = ["127.0.0.1", "localhost", "kaiju-backend"]
 
 
 # Application definition
@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "exercises",
+    "health",
 ]
 
 MIDDLEWARE = [

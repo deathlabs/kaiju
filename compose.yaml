@@ -1,0 +1,49 @@
+services:
+
+  backend:
+    profiles: [ all, backend ]
+    build: backend
+    image: kaiju/backend:latest
+    container_name: kaiju-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - backend/.env
+    depends_on:
+      database:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8000/api/v1/health/ > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 2
+      start_period: 5s
+
+  database:
+    profiles: [ all, backend, database ]
+    build: database
+    image: kaiju/database:latest
+    container_name: kaiju-database
+    ports:
+      - "5432:5432"
+    volumes:
+      - kaiju_database:/var/lib/postgresql/data
+    env_file:
+      - database/.env
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 2
+      start_period: 5s
+
+  docs:
+    profiles: [ docs ]
+    build: docs
+    image: kaiju/docs:latest
+    container_name: kaiju-docs
+    ports:
+      - "5050:5050"
+
+volumes:
+  kaiju_database:
