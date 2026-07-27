@@ -1,5 +1,4 @@
 # Standard library imports.
-from typing import List
 from uuid import UUID
 
 # Third party imports.
@@ -17,7 +16,7 @@ from exercises.schema import (
 api = NinjaAPI(urls_namespace="exercises")
 
 
-@api.get("/", response=List[ExerciseSchema])
+@api.get("/", response=list[ExerciseSchema])
 def list_exercises(request):
     """Return all exercises."""
     return Exercise.objects.all()
