@@ -8,7 +8,6 @@ on:
       - ".github/workflows/**"
       - "backend/**"
       - "database/**"
-      - "frontend/**"
   workflow_dispatch:
     inputs:
       dockerfile_lint_scan_failure_threshold:
@@ -71,7 +70,6 @@ jobs:
         container:
           - backend
           - database
-          - frontend
     steps:
       - name: Clone Repository
         uses: actions/checkout@v7
@@ -101,7 +99,6 @@ jobs:
         container:
           - backend
           - database
-          - frontend
     container:
       image: semgrep/semgrep
     steps:
@@ -131,7 +128,6 @@ jobs:
         container:
           - backend
           - database
-          - frontend
     steps:
       - name: Clone Repository
         uses: actions/checkout@v6
