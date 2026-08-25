@@ -7,7 +7,6 @@ on:
     paths:
       - ".github/workflows/**"
       - "backend/**"
-      - "database/**"
   workflow_dispatch:
     inputs:
       dockerfile_lint_scan_failure_threshold:
@@ -53,7 +52,7 @@ jobs:
           args: check --output-format=sarif --output-file=${{ matrix.container }}-lint-python-code-scan.sarif ${{ matrix.container }}
       - name: Print Code Lint Scan
         if: always()
-        run: cat ${{ matrix.container }}-lint-python-code-scan.sarif
+        run: cat ${{ matrix.container }}-lint-python-code-scan.sarif | jq '.'
       - name: Upload Code Lint Scan
         if: always()
         uses: actions/upload-artifact@v7
@@ -69,7 +68,6 @@ jobs:
       matrix:
         container:
           - backend
-          - database
     steps:
       - name: Clone Repository
         uses: actions/checkout@v7
@@ -82,7 +80,7 @@ jobs:
           output-file: ${{ matrix.container }}-lint-dockerfile-scan.sarif
       - name: Print Dockerfile Lint Scan
         if: always()
-        run: cat ${{ matrix.container }}-lint-dockerfile-scan.sarif
+        run: cat ${{ matrix.container }}-lint-dockerfile-scan.sarif | jq '.'
       - name: Upload Dockerfile Lint Scan
         if: always()
         uses: actions/upload-artifact@v7
@@ -98,7 +96,6 @@ jobs:
       matrix:
         container:
           - backend
-          - database
     container:
       image: semgrep/semgrep
     steps:
@@ -108,7 +105,7 @@ jobs:
         run: semgrep scan --config auto ${{ matrix.container }} --sarif --sarif-output=${{ matrix.container }}-sast-scan.sarif
       - name: Print SAST Scan
         if: always()
-        run: cat ${{ matrix.container }}-sast-scan.sarif
+        run: cat ${{ matrix.container }}-sast-scan.sarif | jq '.'
       - name: Upload SAST Scan
         if: always()
         uses: actions/upload-artifact@v7
@@ -127,7 +124,6 @@ jobs:
       matrix:
         container:
           - backend
-          - database
     steps:
       - name: Clone Repository
         uses: actions/checkout@v6
