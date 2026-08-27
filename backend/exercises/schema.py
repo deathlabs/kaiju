@@ -11,8 +11,9 @@ class ExerciseCreateSchema(Schema):
 
     title: str
     scenario: str
-    scheduled_start: datetime
-    scheduled_end: datetime
+    type: str 
+    start_date_time: datetime
+    end_date_time: datetime
 
 
 class ExerciseSchema(Schema):
@@ -21,11 +22,12 @@ class ExerciseSchema(Schema):
     id: UUID
     title: str
     scenario: str
+    type: str
     status: str
-    scheduled_start: datetime
-    scheduled_end: datetime
-    actual_start: datetime | None
-    actual_end: datetime | None
+    start_date_time: datetime
+    end_date_time: datetime
+    red_team_coordinated_at: datetime | None
+    read_aheads_sent_at: datetime | None
     created_at: datetime
     updated_at: datetime
 

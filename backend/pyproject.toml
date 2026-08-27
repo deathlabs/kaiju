@@ -1,0 +1,9 @@
+[project]
+name = "kaiju"
+version = "0.1.0"
+dependencies = [
+    "django-ninja",
+    "psycopg2-binary",
+    "tzdata",
+    "uvicorn",
+]

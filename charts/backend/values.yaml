@@ -1,0 +1,13 @@
+# charts/backend/values.yaml
+
+---
+namespace: kaiju
+replicaCount: 1
+image: 
+  pullPolicy: Always
+  repository: kaiju/backend
+  tag: latest
+service: 
+  type: ClusterIP
+  name: backend
+  port: 8000

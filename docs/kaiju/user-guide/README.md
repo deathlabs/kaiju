@@ -1,2 +1,0 @@
-# User Guide
-Text goes here.

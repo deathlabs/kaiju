@@ -1,7 +1,0 @@
----
-site_name: kaiju
-docs_dir: kaiju
-theme: readthedocs
-nav:
-  - "User Guide": user-guide/README.md
-  - "Developer Guide": developer-guide/README.md

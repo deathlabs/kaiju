@@ -7,39 +7,151 @@ from django.db import models
 
 
 class Exercise(models.Model):
-    """Represent an incident response tabletop exercise."""
+    """Incident response tabletop exercise."""
 
     class Status(models.TextChoices):
-        DRAFT = "draft", "Draft"
-        SCHEDULED = "scheduled", "Scheduled"
-        IN_PROGRESS = "in_progress", "In Progress"
-        COMPLETED = "completed", "Completed"
-        CANCELLED = "cancelled", "Cancelled"
+        PLANNED = "planned"
+        PREPARED = "prepared"
+        IN_PROGRESS = "in_progress"
+        COMPLETED = "completed"
+
+    class Type(models.TextChoices):
+        DISCUSSION = "discussion"
+        DISCUSSION_AND_HANDS_ON = "discussion_and_hands_on"
 
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
-    title = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="exercises_created",
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+    )
+    facilitator = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="exercises_facilitated",
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+    )
+    references = models.ManyToManyField(
+        "references.Reference",
+        related_name="exercises",
+        blank=True,
+    )
+    type = models.CharField(
+        max_length=30,
+        choices=Type.choices,
+        default=Type.DISCUSSION,
+    )
+    start_date_time = models.DateTimeField()
+    end_date_time = models.DateTimeField()
+    title = models.CharField(max_length=100)
     scenario = models.TextField()
+    red_team_coordinated_at = models.DateTimeField(null=True, blank=True)
+    read_aheads_sent_at = models.DateTimeField(null=True, blank=True)
     status = models.CharField(
         max_length=20,
         choices=Status.choices,
-        default=Status.DRAFT,
+        default=Status.PLANNED,
     )
-    scheduled_start = models.DateTimeField()
-    scheduled_end = models.DateTimeField()
-    actual_start = models.DateTimeField(null=True, blank=True)
-    actual_end = models.DateTimeField(null=True, blank=True)
-    created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.PROTECT,
-        related_name="created_exercises",
-        null=True,
-        blank=True,
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    class Meta:
-        ordering = ["-scheduled_start"]
 
-    def __str__(self) -> str:
-        return self.title
+class Objective(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    exercise = models.ForeignKey(
+        Exercise,
+        on_delete=models.CASCADE,
+        related_name="objectives",
+    )
+    number = models.PositiveIntegerField()
+    description = models.TextField()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["exercise", "number"],
+                name="unique_objective_number_per_exercise",
+            )
+        ]
+
+
+class FacilitatorQuestion(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    exercise = models.ForeignKey(
+        Exercise,
+        related_name="facilitator_questions",
+        on_delete=models.CASCADE,
+    )
+    related_objectives = models.ManyToManyField(
+        Objective,
+        related_name="facilitator_questions",
+        blank=True,
+    )
+    question = models.TextField()
+    number = models.PositiveIntegerField()
+    expected_answer = models.TextField(blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["exercise", "number"],
+                name="unique_facilitator_question_number_per_exercise",
+            )
+        ]
+
+
+class Event(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    exercise = models.ForeignKey(
+        Exercise,
+        related_name="events",
+        on_delete=models.CASCADE,
+    )
+    number = models.PositiveIntegerField()
+    description = models.TextField()
+    expected_actions = models.TextField()
+    related_objectives = models.ManyToManyField(
+        Objective,
+        related_name="events",
+        blank=True,
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["exercise", "number"],
+                name="unique_event_number_per_exercise",
+            )
+        ]
+
+
+class Inject(models.Model):
+    class DeliveryMethod(models.TextChoices):
+        INDEX_CARD = "index_card"
+        PHONE_CALL = "phone_call"
+        EMAIL = "email"
+        CHAT_MESSAGE = "chat_message"
+
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    event = models.ForeignKey(
+        Event,
+        related_name="injects",
+        on_delete=models.CASCADE,
+    )
+    number = models.CharField(max_length=10)
+    scheduled_start_time = models.DateTimeField()
+    delivery_method = models.CharField(max_length=20, choices=DeliveryMethod.choices)
+    sender = models.CharField(max_length=100)
+    recipient = models.CharField(max_length=100)
+    message = models.TextField()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["event", "number"],
+                name="unique_inject_number_per_event",
+            )
+        ]

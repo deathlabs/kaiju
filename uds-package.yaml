@@ -1,0 +1,15 @@
+# uds-package.yaml
+
+---
+apiVersion: uds.dev/v1alpha1
+kind: Package
+metadata:
+  namespace: kaiju
+  name: kaiju
+spec:
+  network:
+    expose:    
+      - service: backend
+        selector:
+          app.kubernetes.io/component: backend
+        host: kaiju

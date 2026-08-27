@@ -212,7 +212,6 @@ __marimo__/
 *.crt
 *.key
 
-uv.lock
 .env.secrets
 
 .venv

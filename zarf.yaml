@@ -1,0 +1,26 @@
+# zarf.yaml
+
+---
+kind: ZarfPackageConfig
+metadata:
+  name: kaiju
+  version: 0.1.0
+  annotations:
+    dev.uds.title: Kaiju
+components:
+  - name: kaiju
+    required: true
+    manifests:
+      - name: kaiju
+        namespace: kaiju
+        files:
+          - uds-package.yaml
+    charts:
+      - name: kaiju
+        version: 0.1.0
+        namespace: kaiju
+        localPath: charts/backend
+        valuesFiles:
+          - charts/backend/values.yaml
+    images:
+      - docker.io/kaiju/backend:latest
