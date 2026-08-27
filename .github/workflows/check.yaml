@@ -49,7 +49,8 @@ jobs:
       - name: Run Python Ruff
         uses: astral-sh/ruff-action@v4.1.0
         with:
-          args: check --exclude "**/migrations/**" --output-format=sarif --output-file=${{ matrix.container }}-lint-python-code-scan.sarif ${{ matrix.container }}
+          src: ${{ matrix.container }}
+          args: check --exclude migrations --output-format=sarif --output-file=${{ matrix.container }}-lint-python-code-scan.sarif ${{ matrix.container }}
       - name: Print Code Lint Scan
         if: always()
         run: cat ${{ matrix.container }}-lint-python-code-scan.sarif | jq '.'
