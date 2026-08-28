@@ -4,8 +4,9 @@ from django.urls import path
 
 # Local imports.
 from exercises.api import api as exercises_api
-from .health import api as health_api
 from references.api import api as references_api
+
+from .health import api as health_api
 
 urlpatterns = [
     path("admin/", admin.site.urls),
