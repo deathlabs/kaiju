@@ -70,12 +70,12 @@ class Objective(models.Model):
     description = models.TextField()
 
     class Meta:
-        constraints = [
+        constraints = (
             models.UniqueConstraint(
                 fields=["exercise", "number"],
                 name="unique_objective_number_per_exercise",
-            )
-        ]
+            ),
+        )
 
 
 class FacilitatorQuestion(models.Model):
@@ -95,12 +95,12 @@ class FacilitatorQuestion(models.Model):
     expected_answer = models.TextField(blank=True)
 
     class Meta:
-        constraints = [
+        constraints = (
             models.UniqueConstraint(
                 fields=["exercise", "number"],
                 name="unique_facilitator_question_number_per_exercise",
-            )
-        ]
+            ),
+        )
 
 
 class Event(models.Model):
@@ -120,12 +120,12 @@ class Event(models.Model):
     )
 
     class Meta:
-        constraints = [
+        constraints = (
             models.UniqueConstraint(
                 fields=["exercise", "number"],
                 name="unique_event_number_per_exercise",
-            )
-        ]
+            ),
+        )
 
 
 class Inject(models.Model):
@@ -149,9 +149,9 @@ class Inject(models.Model):
     message = models.TextField()
 
     class Meta:
-        constraints = [
+        constraints = (
             models.UniqueConstraint(
                 fields=["event", "number"],
                 name="unique_inject_number_per_event",
-            )
-        ]
+            ),
+        )

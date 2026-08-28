@@ -11,7 +11,7 @@ class ExerciseCreateSchema(Schema):
 
     title: str
     scenario: str
-    type: str 
+    type: str
     start_date_time: datetime
     end_date_time: datetime
 
