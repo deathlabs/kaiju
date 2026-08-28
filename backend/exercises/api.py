@@ -6,9 +6,10 @@ from ninja import NinjaAPI, Status
 
 # Local imports.
 from exercises.models import Exercise
-from exercises.schema import (
+from exercises.schemas import (
     ExerciseCreateSchema,
     ExerciseSchema,
+    ExerciseUpdateSchema,
     NotFoundSchema,
 )
 
@@ -36,3 +37,17 @@ def create_exercise(request, payload: ExerciseCreateSchema):
     """Create an exercise."""
     exercise = Exercise.objects.create(**payload.model_dump())
     return Status(201, exercise)
+
+
+@api.patch("/{exercise_id}/", response={200: ExerciseSchema, 404: NotFoundSchema})
+def update_exercise(request, exercise_id: UUID, payload: ExerciseUpdateSchema):
+    """Update an exercise."""
+    try:
+        exercise = Exercise.objects.get(id=exercise_id)
+    except Exercise.DoesNotExist:
+        return Status(404, {"message": "Exercise not found"})
+
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(exercise, field, value)
+    exercise.save()
+    return exercise

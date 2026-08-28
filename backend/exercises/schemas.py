@@ -32,6 +32,19 @@ class ExerciseSchema(Schema):
     updated_at: datetime
 
 
+class ExerciseUpdateSchema(Schema):
+    """Define the fields that can be updated on an exercise."""
+
+    title: str | None = None
+    scenario: str | None = None
+    type: str | None = None
+    status: str | None = None
+    start_date_time: datetime | None = None
+    end_date_time: datetime | None = None
+    red_team_coordinated_at: datetime | None = None
+    read_aheads_sent_at: datetime | None = None
+
+
 class NotFoundSchema(Schema):
     """Represent a resource-not-found response."""
 

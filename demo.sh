@@ -9,4 +9,16 @@ curl -X POST http://localhost:8000/api/v1/exercises/ \
     "end_date_time": "2026-09-04T15:00:00-04:00"
   }'
 
-curl http://localhost:8000/api/v1/exercises/
+export EXERCISE=$(curl -s http://localhost:8000/api/v1/exercises/ | jq -r .[0].id)
+
+curl -X PATCH http://localhost:8000/api/v1/exercises/$EXERCISE/ \
+  -H "Content-Type: application/json" \
+  -d '{"status": "prepared"}'
+
+
+curl -X PATCH http://localhost:8000/api/v1/exercises/$EXERCISE/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "start_date_time": "2026-09-04T14:00:00-04:00",
+    "end_date_time": "2026-09-04T16:00:00-04:00"
+  }'

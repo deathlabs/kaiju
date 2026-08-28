@@ -60,3 +60,13 @@ status:
 
 lint:
 	ruff check --exclude migrations
+
+# ---------------------------------------------------------
+# Check formatting.
+# ---------------------------------------------------------
+
+.PHONY: format
+.SILENT: format
+
+format:
+	ruff format --exclude migrations
