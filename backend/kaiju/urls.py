@@ -3,8 +3,8 @@ from django.contrib import admin
 from django.urls import path
 
 # Local imports.
-from .health import api as health_api
 from exercises.api import api as exercises_api
+from .health import api as health_api
 from references.api import api as references_api
 
 urlpatterns = [

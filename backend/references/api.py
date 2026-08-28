@@ -1,5 +1,4 @@
 # Standard library imports.
-from typing import List
 from uuid import UUID
 
 # Third party imports.
@@ -8,16 +7,16 @@ from ninja import NinjaAPI, Status
 # Local imports.
 from references.models import Reference
 from references.schema import (
+    NotFoundSchema,
     ReferenceCreateSchema,
     ReferenceSchema,
-    NotFoundSchema,
 )
 
 # Init the references API.
 api = NinjaAPI(urls_namespace="references")
 
 
-@api.get("/", response=List[ReferenceSchema])
+@api.get("/", response=list[ReferenceSchema])
 def list_references(request):
     """Return all references."""
     return Reference.objects.all()
