@@ -44,8 +44,19 @@ stop:
 # ---------------------------------------------------------
 # Check the status of the containers.
 # ---------------------------------------------------------
+
 .PHONY: status
 .SILENT: status
 
 status:
 	docker compose --profile $(DOCKER_COMPOSE_PROFILE) ps --format "table {{.Name}}\t{{.Ports}}\t{{.Status}}"
+
+# ---------------------------------------------------------
+# Check for lint.
+# ---------------------------------------------------------
+
+.PHONY: lint
+.SILENT: lint
+
+lint:
+	ruff check --exclude migrations
