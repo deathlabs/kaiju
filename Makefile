@@ -18,7 +18,7 @@ DOCKER_COMPOSE_PROFILE ?= all
 .PHONY: build
 .SILENT: build
 
-build: 
+build: qa
 	docker compose --profile $(DOCKER_COMPOSE_PROFILE) build
 
 # ---------------------------------------------------------
@@ -28,7 +28,7 @@ build:
 .PHONY: start
 .SILENT: start
 
-start:
+start: qa
 	docker compose --profile $(DOCKER_COMPOSE_PROFILE) up -d
 
 # ---------------------------------------------------------
@@ -52,21 +52,12 @@ status:
 	docker compose --profile $(DOCKER_COMPOSE_PROFILE) ps --format "table {{.Name}}\t{{.Ports}}\t{{.Status}}"
 
 # ---------------------------------------------------------
-# Check for lint.
+# Run the linter and formatter.
 # ---------------------------------------------------------
 
-.PHONY: lint
-.SILENT: lint
+.PHONY: qa
+.SILENT: qa
 
-lint:
-	ruff check --exclude migrations
-
-# ---------------------------------------------------------
-# Check formatting.
-# ---------------------------------------------------------
-
-.PHONY: format
-.SILENT: format
-
-format:
+qa:
+	ruff check --fix --exclude migrations &&\
 	ruff format --exclude migrations

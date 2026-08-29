@@ -1,7 +1,7 @@
 # Third party imports.
-from ninja import NinjaAPI
+from ninja import Router
 
-api = NinjaAPI(urls_namespace="health")
+api = Router(tags=["health"])
 
 
 @api.get("/")

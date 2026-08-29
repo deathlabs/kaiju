@@ -2,7 +2,7 @@
 from uuid import UUID
 
 # Third party imports.
-from ninja import NinjaAPI, Status
+from ninja import Router, Status
 
 # Local imports.
 from exercises.models import Exercise
@@ -13,17 +13,17 @@ from exercises.schemas import (
     NotFoundSchema,
 )
 
-# Init the exercises API.
-api = NinjaAPI(urls_namespace="exercises")
+# Init the exercises router.
+router = Router(tags=["exercises"])
 
 
-@api.get("/", response=list[ExerciseSchema])
+@router.get("/", response=list[ExerciseSchema])
 def list_exercises(request):
     """Return all exercises."""
     return Exercise.objects.all()
 
 
-@api.get("/{exercise_id}/", response={200: ExerciseSchema, 404: NotFoundSchema})
+@router.get("/{exercise_id}/", response={200: ExerciseSchema, 404: NotFoundSchema})
 def get_exercise(request, exercise_id: UUID):
     """Return an exercise by its ID."""
     try:
@@ -32,14 +32,16 @@ def get_exercise(request, exercise_id: UUID):
         return Status(404, {"message": "Exercise not found"})
 
 
-@api.post("/", response={201: ExerciseSchema})
+@router.post(
+    "/", response={201: ExerciseSchema, 400: NotFoundSchema, 404: NotFoundSchema}
+)
 def create_exercise(request, payload: ExerciseCreateSchema):
     """Create an exercise."""
     exercise = Exercise.objects.create(**payload.model_dump())
     return Status(201, exercise)
 
 
-@api.patch("/{exercise_id}/", response={200: ExerciseSchema, 404: NotFoundSchema})
+@router.patch("/{exercise_id}/", response={200: ExerciseSchema, 404: NotFoundSchema})
 def update_exercise(request, exercise_id: UUID, payload: ExerciseUpdateSchema):
     """Update an exercise."""
     try:

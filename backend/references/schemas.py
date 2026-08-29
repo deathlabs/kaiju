@@ -7,14 +7,21 @@ from ninja import Schema
 
 
 class ReferenceCreateSchema(Schema):
-    """Define the information required to create an reference."""
+    """The information required to create an reference."""
 
     title: str
     url: str
 
 
+class ReferenceUpdateSchema(Schema):
+    """The fields that can be updated on a reference."""
+
+    title: str | None = None
+    url: str | None = None
+
+
 class ReferenceSchema(Schema):
-    """Represent an reference returned by the API."""
+    """The information returned by the API for a reference."""
 
     id: UUID
     title: str
@@ -24,6 +31,6 @@ class ReferenceSchema(Schema):
 
 
 class NotFoundSchema(Schema):
-    """Represent a resource-not-found response."""
+    """The information returned when a resource is not found."""
 
     message: str
