@@ -11,3 +11,12 @@ service:
   type: ClusterIP
   name: backend
   port: 8000
+database:
+  engine: postgres
+  host: database
+  port: 5432
+  sslmode: disable
+  secret_key: kaiju
+  name: kaiju
+  user: kaiju
+  password: kaiju

@@ -5,19 +5,23 @@ set -e
 # Initialize Postgres.
 if [ ! -f "/var/lib/postgresql/data/PG_VERSION" ]; then
   # Create the prerequisite databases.
-  initdb -D /var/lib/postgresql/data -A md5 --pwfile=<(echo "$PGPASSWORD")
+  initdb \
+    -D /var/lib/postgresql/data \
+    -U "$PGUSER" \
+    -A md5 \
+    --pwfile=<(echo "$PGPASSWORD")
 
   # Start Postgres as a background process.
   postgres -D /var/lib/postgresql/data &
   POSTGRES_PID=$!
 
   # Wait for Postgres to start.
-  until pg_isready -h 127.0.0.1 -p 5432 -U postgres; do
+  until pg_isready -h 127.0.0.1 -p 5432 -U "$PGUSER"; do
     sleep 1
   done
 
   # Create the app's database.
-  createdb -U postgres "$PGDATABASE"
+  createdb -U "$PGUSER" "$PGDATABASE"
 
   # Stop Postgres.
   kill "$POSTGRES_PID"

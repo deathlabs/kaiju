@@ -25,15 +25,11 @@ class Exercise(models.Model):
         settings.AUTH_USER_MODEL,
         related_name="exercises_created",
         on_delete=models.PROTECT,
-        blank=True,
-        null=True,
     )
-    facilitator = models.ForeignKey(
+    facilitators = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
         related_name="exercises_facilitated",
-        on_delete=models.PROTECT,
         blank=True,
-        null=True,
     )
     references = models.ManyToManyField(
         "references.Reference",

@@ -2,6 +2,7 @@
 from uuid import UUID
 
 # Third party imports.
+from django.contrib.auth import get_user_model
 from ninja import Router, Status
 from objectives.models import Objective
 from references.models import Reference
@@ -9,6 +10,7 @@ from references.models import Reference
 # Local imports.
 from exercises.models import Exercise, Participant
 from exercises.schemas import (
+    BadRequestResponseSchema,
     ExerciseCreateSchema,
     ExerciseSchema,
     ExerciseUpdateSchema,
@@ -18,6 +20,9 @@ from exercises.schemas import (
     ParticipantUpdateSchema,
 )
 
+# Get the configured user model.
+User = get_user_model()
+
 # Init the exercises router.
 router = Router(tags=["exercises"])
 
@@ -25,7 +30,12 @@ router = Router(tags=["exercises"])
 @router.post("/", response={201: ExerciseSchema})
 def create_exercise(request, payload: ExerciseCreateSchema):
     """Create an exercise."""
-    exercise = Exercise.objects.create(**payload.model_dump())
+    exercise = Exercise.objects.create(
+        created_by=request.user,
+        **payload.model_dump(),
+    )
+    exercise.facilitators.add(request.user)
+
     return Status(201, exercise)
 
 
@@ -54,6 +64,7 @@ def get_exercise(request, exercise_id: UUID):
     "/{exercise_id}/",
     response={
         200: ExerciseSchema,
+        400: BadRequestResponseSchema,
         404: NotFoundResponseSchema,
     },
 )
@@ -65,13 +76,33 @@ def update_exercise(request, exercise_id: UUID, payload: ExerciseUpdateSchema):
         return Status(404, {"message": "Exercise not found"})
 
     data = payload.model_dump(exclude_unset=True)
+
+    facilitator_ids = data.pop("facilitator_ids", None)
     reference_ids = data.pop("reference_ids", None)
     objective_ids = data.pop("objective_ids", None)
+
+    if facilitator_ids == []:
+        return Status(
+            400,
+            {"message": "An exercise must have at least one facilitator"},
+        )
+
+    if facilitator_ids is not None:
+        facilitators = User.objects.filter(id__in=facilitator_ids)
+
+        if facilitators.count() != len(set(facilitator_ids)):
+            return Status(
+                400,
+                {"message": "One or more facilitators were not found"},
+            )
 
     for field, value in data.items():
         setattr(exercise, field, value)
 
     exercise.save()
+
+    if facilitator_ids is not None:
+        exercise.facilitators.set(facilitators)
 
     if objective_ids is not None:
         objectives = Objective.objects.filter(id__in=objective_ids)
@@ -188,6 +219,7 @@ def update_participant(
         setattr(participant, field, value)
 
     participant.save()
+
     return Status(200, participant)
 
 
@@ -209,4 +241,5 @@ def delete_participant(request, exercise_id: UUID, participant_id: UUID):
         return Status(404, {"message": "Participant not found"})
 
     participant.delete()
+
     return Status(204, None)

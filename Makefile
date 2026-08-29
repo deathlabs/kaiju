@@ -61,3 +61,24 @@ status:
 qa:
 	ruff check --fix --exclude migrations &&\
 	ruff format --exclude migrations
+
+# ---------------------------------------------------------
+# Deploy the Zarf package.
+# ---------------------------------------------------------
+
+.PHONY: deploy
+.SILENT: deploy
+
+deploy: remove
+	uds zarf package create --confirm &&\
+	uds zarf package deploy zarf-package-kaiju-amd64-0.1.0.tar.zst --confirm
+
+# ---------------------------------------------------------
+# Remove the Zarf package.
+# ---------------------------------------------------------
+
+.PHONY: remove
+.SILENT: remove
+remove: 
+	uds zarf package remove kaiju --confirm || true
+	uds zarf tools kubectl delete namespace kaiju || true

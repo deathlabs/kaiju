@@ -4,6 +4,6 @@ from ninja import Router
 api = Router(tags=["health"])
 
 
-@api.get("/")
+@api.get("/", auth=None)
 def health(request):
     return {"status": "ok"}

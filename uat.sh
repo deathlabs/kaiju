@@ -2,7 +2,21 @@
 
 set -euo pipefail
 
+JWT=$(
+  cd backend
+
+  set -a
+  source .env
+  set +a
+
+  export PGHOST=localhost
+  uv run python manage.py shell -c \
+    'from django.contrib.auth import get_user_model; from ninja_jwt.tokens import RefreshToken; u=get_user_model().objects.first(); print(RefreshToken.for_user(u).access_token)' \
+    | tail -n 1
+)
+
 BASE_URL="${BASE_URL:-http://localhost:8000/api/v1}"
+JWT="${JWT:?JWT environment variable must be set}"
 
 PASS=0
 FAIL=0
@@ -56,11 +70,23 @@ assert_nonempty() {
   fi
 }
 
+api_curl() {
+  curl -fsS \
+    -H "Authorization: Bearer $JWT" \
+    "$@"
+}
+
 endpoint_exists() {
   local url="$1"
 
   local status
-  status=$(curl -s -o /dev/null -w "%{http_code}" "$url")
+  status=$(
+    curl -s \
+      -o /dev/null \
+      -w "%{http_code}" \
+      -H "Authorization: Bearer $JWT" \
+      "$url"
+  )
 
   [[ "$status" != "404" ]]
 }
@@ -87,7 +113,7 @@ fi
 section "PLANNING STEP 1: POLICIES AND PLANS"
 
 REFERENCE_RESPONSE=$(
-  curl -fsS \
+  api_curl \
     -X POST "$BASE_URL/references/" \
     -H "Content-Type: application/json" \
     -d '{
@@ -108,7 +134,7 @@ assert_eq \
   "Reference title is stored"
 
 REFERENCE_GET=$(
-  curl -fsS "$BASE_URL/references/$REFERENCE_ID/"
+  api_curl "$BASE_URL/references/$REFERENCE_ID/"
 )
 
 assert_eq \
@@ -117,7 +143,7 @@ assert_eq \
   "Reference can be retrieved by ID"
 
 REFERENCE_PATCH=$(
-  curl -fsS \
+  api_curl \
     -X PATCH "$BASE_URL/references/$REFERENCE_ID/" \
     -H "Content-Type: application/json" \
     -d '{
@@ -139,7 +165,7 @@ assert_eq \
 section "PLANNING STEPS 3-5: EXERCISE"
 
 EXERCISE_RESPONSE=$(
-  curl -fsS \
+  api_curl \
     -X POST "$BASE_URL/exercises/" \
     -H "Content-Type: application/json" \
     -d '{
@@ -184,6 +210,10 @@ assert_eq \
   "planned" \
   "Exercise begins in planned state"
 
+assert_nonempty \
+  "$(jq -r '.facilitator_ids[0]' <<< "$EXERCISE_RESPONSE")" \
+  "Exercise creator is assigned as a facilitator"
+
 # ---------------------------------------------------------------------------
 # Exercise Retrieval
 # ---------------------------------------------------------------------------
@@ -191,7 +221,7 @@ assert_eq \
 section "EXERCISE RETRIEVAL"
 
 EXERCISES=$(
-  curl -fsS "$BASE_URL/exercises/"
+  api_curl "$BASE_URL/exercises/"
 )
 
 if jq -e --arg id "$EXERCISE_ID" \
@@ -203,7 +233,7 @@ else
 fi
 
 EXERCISE_GET=$(
-  curl -fsS "$BASE_URL/exercises/$EXERCISE_ID/"
+  api_curl "$BASE_URL/exercises/$EXERCISE_ID/"
 )
 
 assert_eq \
@@ -218,7 +248,7 @@ assert_eq \
 section "EXERCISE UPDATES"
 
 SCHEDULE_UPDATE=$(
-  curl -fsS \
+  api_curl \
     -X PATCH "$BASE_URL/exercises/$EXERCISE_ID/" \
     -H "Content-Type: application/json" \
     -d '{
@@ -235,7 +265,7 @@ assert_nonempty \
   "$(jq -r '.end_date_time' <<< "$SCHEDULE_UPDATE")" \
   "Exercise end time can be changed"
 
-curl -fsS \
+api_curl \
   -X PATCH "$BASE_URL/exercises/$EXERCISE_ID/" \
   -H "Content-Type: application/json" \
   -d '{
@@ -252,7 +282,7 @@ pass "Exercise schedule can be restored"
 section "PLANNING STEP 1: EXERCISE REFERENCES"
 
 EXERCISE_REFERENCE_UPDATE=$(
-  curl -fsS \
+  api_curl \
     -X PATCH "$BASE_URL/exercises/$EXERCISE_ID/" \
     -H "Content-Type: application/json" \
     -d "{
@@ -269,7 +299,7 @@ else
 fi
 
 EXERCISE_GET=$(
-  curl -fsS "$BASE_URL/exercises/$EXERCISE_ID/"
+  api_curl "$BASE_URL/exercises/$EXERCISE_ID/"
 )
 
 if jq -e --arg id "$REFERENCE_ID" \
@@ -287,7 +317,7 @@ fi
 section "PLANNING STEP 2: OBJECTIVES"
 
 OBJECTIVE_RESPONSE=$(
-  curl -fsS \
+  api_curl \
     -X POST "$BASE_URL/objectives/" \
     -H "Content-Type: application/json" \
     -d '{
@@ -308,7 +338,7 @@ assert_eq \
   "Objective title is stored"
 
 OBJECTIVE_GET=$(
-  curl -fsS "$BASE_URL/objectives/$OBJECTIVE_ID/"
+  api_curl "$BASE_URL/objectives/$OBJECTIVE_ID/"
 )
 
 assert_eq \
@@ -317,7 +347,7 @@ assert_eq \
   "Objective can be retrieved by ID"
 
 OBJECTIVE_PATCH=$(
-  curl -fsS \
+  api_curl \
     -X PATCH "$BASE_URL/objectives/$OBJECTIVE_ID/" \
     -H "Content-Type: application/json" \
     -d '{
@@ -331,7 +361,7 @@ assert_eq \
   "Objective can be updated"
 
 EXERCISE_OBJECTIVE_UPDATE=$(
-  curl -fsS \
+  api_curl \
     -X PATCH "$BASE_URL/exercises/$EXERCISE_ID/" \
     -H "Content-Type: application/json" \
     -d "{
@@ -348,7 +378,7 @@ else
 fi
 
 EXERCISE_GET=$(
-  curl -fsS "$BASE_URL/exercises/$EXERCISE_ID/"
+  api_curl "$BASE_URL/exercises/$EXERCISE_ID/"
 )
 
 if jq -e --arg id "$OBJECTIVE_ID" \
@@ -402,7 +432,7 @@ fi
 section "PREPARING STEP 1: RED TEAM COORDINATION"
 
 PREP_RESPONSE=$(
-  curl -fsS \
+  api_curl \
     -X PATCH "$BASE_URL/exercises/$EXERCISE_ID/" \
     -H "Content-Type: application/json" \
     -d '{
@@ -421,7 +451,7 @@ assert_nonempty \
 section "PREPARING STEPS 2 - 3: PARTICIPANTS AND READ-AHEADS"
 
 PARTICIPANT_RESPONSE=$(
-  curl -fsS \
+  api_curl \
     -X POST "$BASE_URL/exercises/$EXERCISE_ID/participants/" \
     -H "Content-Type: application/json" \
     -d '{
@@ -444,7 +474,7 @@ assert_eq \
   "Participant role is stored"
 
 PARTICIPANTS=$(
-  curl -fsS "$BASE_URL/exercises/$EXERCISE_ID/participants/"
+  api_curl "$BASE_URL/exercises/$EXERCISE_ID/participants/"
 )
 
 if jq -e --arg id "$PARTICIPANT_ID" \
@@ -456,7 +486,7 @@ else
 fi
 
 PARTICIPANT_GET=$(
-  curl -fsS \
+  api_curl \
     "$BASE_URL/exercises/$EXERCISE_ID/participants/$PARTICIPANT_ID/"
 )
 
@@ -466,7 +496,7 @@ assert_eq \
   "Participant can be retrieved by ID"
 
 PARTICIPANT_UPDATE=$(
-  curl -fsS \
+  api_curl \
     -X PATCH "$BASE_URL/exercises/$EXERCISE_ID/participants/$PARTICIPANT_ID/" \
     -H "Content-Type: application/json" \
     -d '{
@@ -480,7 +510,7 @@ assert_eq \
   "Participant can be updated"
 
 READ_AHEAD_RESPONSE=$(
-  curl -fsS \
+  api_curl \
     -X PATCH "$BASE_URL/exercises/$EXERCISE_ID/" \
     -H "Content-Type: application/json" \
     -d '{
@@ -499,7 +529,7 @@ assert_nonempty \
 section "PREPARED STATE"
 
 PREPARED_RESPONSE=$(
-  curl -fsS \
+  api_curl \
     -X PATCH "$BASE_URL/exercises/$EXERCISE_ID/" \
     -H "Content-Type: application/json" \
     -d '{
@@ -519,7 +549,7 @@ assert_eq \
 section "EXECUTING THE TTX"
 
 IN_PROGRESS_RESPONSE=$(
-  curl -fsS \
+  api_curl \
     -X PATCH "$BASE_URL/exercises/$EXERCISE_ID/" \
     -H "Content-Type: application/json" \
     -d '{
@@ -541,7 +571,7 @@ gap "Actual execution state for events, injects, questions, and observations is 
 section "ASSESSING THE TTX"
 
 COMPLETED_RESPONSE=$(
-  curl -fsS \
+  api_curl \
     -X PATCH "$BASE_URL/exercises/$EXERCISE_ID/" \
     -H "Content-Type: application/json" \
     -d '{
@@ -555,7 +585,7 @@ assert_eq \
   "Exercise can transition to completed"
 
 FINAL_EXERCISE=$(
-  curl -fsS "$BASE_URL/exercises/$EXERCISE_ID/"
+  api_curl "$BASE_URL/exercises/$EXERCISE_ID/"
 )
 
 assert_nonempty \
@@ -605,5 +635,5 @@ if (( GAP > 0 )); then
   exit 2
 fi
 
-printf "\nRESULT: API completely addresses implements a TTX workflow.\n"
+printf "\nRESULT: API completely implements a TTX workflow.\n"
 exit 0

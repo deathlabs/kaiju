@@ -1,14 +1,15 @@
-# charts/backend/templates/deployment.yaml
+# charts/database/templates/statefulset.yaml
 
 ---
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   namespace: {{ .Values.namespace }}
   name: {{ .Values.service.name }}
   labels:
     app.kubernetes.io/component: {{ .Values.service.name }}
 spec:
+  serviceName: {{ .Values.service.name }}
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
@@ -18,6 +19,11 @@ spec:
       labels:
         app.kubernetes.io/component: {{ .Values.service.name }}
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 70
+        runAsGroup: 70
+        fsGroup: 70
       containers:
         - name: {{ .Values.service.name }}
           image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
@@ -28,24 +34,34 @@ spec:
             - secretRef:
                 name: {{ .Values.service.name }}
           readinessProbe:
-            httpGet:
-              path: /api/v1/health/
-              port: {{ .Values.service.port }}
-              httpHeaders:
-                - name: Host
-                  value: backend
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U "$PGUSER" -d "$PGDATABASE"
             initialDelaySeconds: 5
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 2
           livenessProbe:
-            httpGet:
-              path: /api/v1/health/
-              port: {{ .Values.service.port }}
-              httpHeaders:
-                - name: Host
-                  value: backend
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U "$PGUSER" -d "$PGDATABASE"
             initialDelaySeconds: 5
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 2
+          volumeMounts:
+            - name: database
+              mountPath: {{ .Values.storage.path }}
+  volumeClaimTemplates:
+    - metadata:
+        name: database
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ .Values.storage.size }}

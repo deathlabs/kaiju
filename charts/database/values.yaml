@@ -1,0 +1,20 @@
+# charts/database/values.yaml
+
+---
+namespace: kaiju
+replicaCount: 1
+image:
+  pullPolicy: Always
+  repository: kaiju/database
+  tag: latest
+service:
+  type: ClusterIP
+  name: database
+  port: 5432
+database:
+  name: kaiju
+  user: kaiju
+  password: kaiju
+storage:
+  path: /var/lib/postgresql
+  size: 5Gi
