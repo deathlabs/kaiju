@@ -5,16 +5,17 @@ from uuid import UUID
 # Third party imports.
 from ninja import Schema
 from pydantic import EmailStr
+from references.schemas import ReferenceSchema
 
 
-class BadRequestSchema(Schema):
-    """The information returned when a request is invalid."""
+class BadRequestResponseSchema(Schema):
+    """The fields returned when a request is invalid."""
 
     message: str
 
 
 class ExerciseCreateSchema(Schema):
-    """The information required to create an exercise."""
+    """The fields required to create an Exercise."""
 
     title: str
     scenario: str
@@ -24,7 +25,7 @@ class ExerciseCreateSchema(Schema):
 
 
 class ExerciseUpdateSchema(Schema):
-    """The fields that can be updated on an exercise."""
+    """The fields that can be updated on an Exercise."""
 
     title: str | None = None
     scenario: str | None = None
@@ -33,11 +34,12 @@ class ExerciseUpdateSchema(Schema):
     start_date_time: datetime | None = None
     end_date_time: datetime | None = None
     red_team_coordinated_at: datetime | None = None
+    reference_ids: list[UUID] | None = None
     read_aheads_sent_at: datetime | None = None
 
 
 class ExerciseSchema(Schema):
-    """The information returned by the API for an exercise."""
+    """The fields of an Exercise."""
 
     id: UUID
     title: str
@@ -48,18 +50,19 @@ class ExerciseSchema(Schema):
     end_date_time: datetime
     red_team_coordinated_at: datetime | None
     read_aheads_sent_at: datetime | None
+    references: list[ReferenceSchema]
     created_at: datetime
     updated_at: datetime
 
 
-class NotFoundSchema(Schema):
-    """The information returned when a resource is not found."""
+class NotFoundResponseSchema(Schema):
+    """The fields returned when a resource is not found."""
 
     message: str
 
 
 class ParticipantSchema(Schema):
-    """The information returned by the API for a participant."""
+    """The fields of a Participant."""
 
     id: UUID
     exercise_id: UUID
@@ -70,7 +73,7 @@ class ParticipantSchema(Schema):
 
 
 class ParticipantCreateSchema(Schema):
-    """The information required to create a participant."""
+    """The fields required to create a Participant."""
 
     first_name: str
     last_name: str
@@ -79,7 +82,7 @@ class ParticipantCreateSchema(Schema):
 
 
 class ParticipantUpdateSchema(Schema):
-    """The fields that can be updated on a participant."""
+    """The fields that can be updated on a Participant."""
 
     first_name: str | None = None
     last_name: str | None = None

@@ -84,7 +84,7 @@ fi
 # Policies and plans
 # ---------------------------------------------------------------------------
 
-section "PLANNING STEP 1 - POLICIES AND PLANS"
+section "PLANNING STEP 1: POLICIES AND PLANS"
 
 REFERENCE_RESPONSE=$(
   curl -fsS \
@@ -136,7 +136,7 @@ assert_eq \
 # Exercise metadata
 # ---------------------------------------------------------------------------
 
-section "PLANNING STEPS 3-5 - EXERCISE"
+section "PLANNING STEPS 3-5: EXERCISE"
 
 EXERCISE_RESPONSE=$(
   curl -fsS \
@@ -246,22 +246,22 @@ curl -fsS \
 pass "Exercise schedule can be restored"
 
 # ---------------------------------------------------------------------------
-# Planning Step 1 - Exercise/Reference Relationship
+# Planning Step 1: Exercise/Reference Relationship
 # ---------------------------------------------------------------------------
 
-section "PLANNING STEP 1 - EXERCISE REFERENCES"
+section "PLANNING STEP 1: EXERCISE REFERENCES"
 
-if endpoint_exists "$BASE_URL/exercises/$EXERCISE_ID/references/"; then
-  pass "Exercise reference API is exposed"
+if curl -sf "$BASE_URL/exercises/$EXERCISE_ID/" | jq -e 'has("references")' > /dev/null; then
+  pass "Exercise references are exposed"
 else
   gap "Exercise.references exists in the data model but is not exposed by the API"
 fi
 
 # ---------------------------------------------------------------------------
-# Planning Step 2 - Objectives
+# Planning Step 2: Objectives
 # ---------------------------------------------------------------------------
 
-section "PLANNING STEP 2 - OBJECTIVES"
+section "PLANNING STEP 2: OBJECTIVES"
 
 if endpoint_exists "$BASE_URL/exercises/$EXERCISE_ID/objectives/"; then
   pass "Objective API is exposed"
@@ -270,10 +270,10 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Planning Step 6 - MSEL
+# Planning Step 6: MSEL
 # ---------------------------------------------------------------------------
 
-section "PLANNING STEP 6 - MASTER SCENARIO EVENT LIST"
+section "PLANNING STEP 6: MASTER SCENARIO EVENT LIST"
 
 if endpoint_exists "$BASE_URL/exercises/$EXERCISE_ID/events/"; then
   pass "MSEL event API is exposed"
@@ -282,10 +282,10 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Planning Step 7 - Inject Tracker
+# Planning Step 7: Inject Tracker
 # ---------------------------------------------------------------------------
 
-section "PLANNING STEP 7 - INJECT TRACKER"
+section "PLANNING STEP 7: INJECT TRACKER"
 
 if endpoint_exists "$BASE_URL/exercises/$EXERCISE_ID/events/test/injects/"; then
   pass "Inject API is exposed"
@@ -294,10 +294,10 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Planning Step 8 - Facilitator Questions
+# Planning Step 8: Facilitator Questions
 # ---------------------------------------------------------------------------
 
-section "PLANNING STEP 8 - FACILITATOR QUESTIONS"
+section "PLANNING STEP 8: FACILITATOR QUESTIONS"
 
 if endpoint_exists "$BASE_URL/exercises/$EXERCISE_ID/questions/"; then
   pass "Facilitator question API is exposed"
@@ -309,7 +309,7 @@ fi
 # Preparing Step 1
 # ---------------------------------------------------------------------------
 
-section "PREPARING STEP 1 - OPFOR / RED TEAM COORDINATION"
+section "PREPARING STEP 1: RED TEAM COORDINATION"
 
 PREP_RESPONSE=$(
   curl -fsS \
@@ -322,13 +322,13 @@ PREP_RESPONSE=$(
 
 assert_nonempty \
   "$(jq -r '.red_team_coordinated_at' <<< "$PREP_RESPONSE")" \
-  "Red Team / OPFOR coordination can be recorded"
+  "Red Team coordination can be recorded"
 
 # ---------------------------------------------------------------------------
-# Preparing Steps 2-3
+# Preparing Steps 2: Participants and Read-Aheads
 # ---------------------------------------------------------------------------
 
-section "PREPARING STEPS 2-3 - PARTICIPANTS AND READ-AHEADS"
+section "PREPARING STEPS 2 - 3: PARTICIPANTS AND READ-AHEADS"
 
 PARTICIPANT_RESPONSE=$(
   curl -fsS \

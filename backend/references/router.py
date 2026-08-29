@@ -7,7 +7,7 @@ from ninja import Router, Status
 # Local imports.
 from references.models import Reference
 from references.schemas import (
-    NotFoundSchema,
+    NotFoundResponseSchema,
     ReferenceCreateSchema,
     ReferenceSchema,
     ReferenceUpdateSchema,
@@ -17,23 +17,9 @@ from references.schemas import (
 router = Router(tags=["references"])
 
 
-@router.get("/", response=list[ReferenceSchema])
-def list_references(request):
-    """Return all references."""
-    return Reference.objects.all()
-
-
-@router.get("/{reference_id}/", response={200: ReferenceSchema, 404: NotFoundSchema})
-def get_reference(request, reference_id: UUID):
-    """Return a reference by its ID."""
-    try:
-        return Reference.objects.get(id=reference_id)
-    except Reference.DoesNotExist:
-        return Status(404, {"message": "Reference not found"})
-
-
 @router.post(
-    "/", response={201: ReferenceSchema, 400: NotFoundSchema, 404: NotFoundSchema}
+    "/",
+    response={201: ReferenceSchema},
 )
 def create_reference(request, payload: ReferenceCreateSchema):
     """Create a reference."""
@@ -41,7 +27,34 @@ def create_reference(request, payload: ReferenceCreateSchema):
     return Status(201, reference)
 
 
-@router.patch("/{reference_id}/", response={200: ReferenceSchema, 404: NotFoundSchema})
+@router.get("/", response={200: list[ReferenceSchema]})
+def list_references(request):
+    """Fetch all references."""
+    return Status(200, Reference.objects.all())
+
+
+@router.get(
+    "/{reference_id}/",
+    response={
+        200: ReferenceSchema,
+        404: NotFoundResponseSchema,
+    },
+)
+def get_reference(request, reference_id: UUID):
+    """Fetch a reference by its ID."""
+    try:
+        return Status(200, Reference.objects.get(id=reference_id))
+    except Reference.DoesNotExist:
+        return Status(404, {"message": "Reference not found"})
+
+
+@router.patch(
+    "/{reference_id}/",
+    response={
+        200: ReferenceSchema,
+        404: NotFoundResponseSchema,
+    },
+)
 def update_reference(request, reference_id: UUID, payload: ReferenceUpdateSchema):
     """Update a reference."""
     try:
@@ -51,5 +64,24 @@ def update_reference(request, reference_id: UUID, payload: ReferenceUpdateSchema
 
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(reference, field, value)
+
     reference.save()
-    return reference
+    return Status(200, reference)
+
+
+@router.delete(
+    "/{reference_id}/",
+    response={
+        204: None,
+        404: NotFoundResponseSchema,
+    },
+)
+def delete_reference(request, reference_id: UUID):
+    """Delete a reference."""
+    try:
+        reference = Reference.objects.get(id=reference_id)
+    except Reference.DoesNotExist:
+        return Status(404, {"message": "Reference not found"})
+
+    reference.delete()
+    return Status(204, None)

@@ -6,22 +6,28 @@ from uuid import UUID
 from ninja import Schema
 
 
+class BadRequestResponseSchema(Schema):
+    """The fields returned when a request is invalid."""
+
+    message: str
+
+
 class ReferenceCreateSchema(Schema):
-    """The information required to create an reference."""
+    """The fields required to create a Reference."""
 
     title: str
     url: str
 
 
 class ReferenceUpdateSchema(Schema):
-    """The fields that can be updated on a reference."""
+    """The fields that can be updated on a Reference."""
 
     title: str | None = None
     url: str | None = None
 
 
 class ReferenceSchema(Schema):
-    """The information returned by the API for a reference."""
+    """The fields of a Reference."""
 
     id: UUID
     title: str
@@ -30,7 +36,7 @@ class ReferenceSchema(Schema):
     updated_at: datetime
 
 
-class NotFoundSchema(Schema):
-    """The information returned when a resource is not found."""
+class NotFoundResponseSchema(Schema):
+    """The fields returned when a resource is not found."""
 
     message: str
