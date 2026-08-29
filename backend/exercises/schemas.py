@@ -4,6 +4,13 @@ from uuid import UUID
 
 # Third party imports.
 from ninja import Schema
+from pydantic import EmailStr
+
+
+class BadRequestSchema(Schema):
+    """The information returned when a request is invalid."""
+
+    message: str
 
 
 class ExerciseCreateSchema(Schema):
@@ -49,3 +56,32 @@ class NotFoundSchema(Schema):
     """The information returned when a resource is not found."""
 
     message: str
+
+
+class ParticipantSchema(Schema):
+    """The information returned by the API for a participant."""
+
+    id: UUID
+    exercise_id: UUID
+    first_name: str
+    last_name: str
+    email: EmailStr
+    role: str
+
+
+class ParticipantCreateSchema(Schema):
+    """The information required to create a participant."""
+
+    first_name: str
+    last_name: str
+    email: EmailStr
+    role: str
+
+
+class ParticipantUpdateSchema(Schema):
+    """The fields that can be updated on a participant."""
+
+    first_name: str | None = None
+    last_name: str | None = None
+    email: EmailStr | None = None
+    role: str | None = None

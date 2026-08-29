@@ -59,6 +59,39 @@ class Exercise(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
 
+class Participant(models.Model):
+    class Role(models.TextChoices):
+        ISO = "information_system_owner"
+        ISSM = "information_system_security_manager"
+        ISSO = "information_system_security_officer"
+        SYSTEM_ADMINISTRATOR = "system_administrator"
+        CSSP = "cybersecurity_service_provider"
+        USER = "user"
+        ATTACKER = "attacker"
+
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    exercise = models.ForeignKey(
+        Exercise,
+        related_name="participants",
+        on_delete=models.CASCADE,
+    )
+    first_name = models.CharField(max_length=100)
+    last_name = models.CharField(max_length=100)
+    email = models.EmailField()
+    role = models.CharField(
+        max_length=40,
+        choices=Role.choices,
+    )
+
+    class Meta:
+        constraints = (
+            models.UniqueConstraint(
+                fields=["exercise", "email"],
+                name="unique_participant_per_exercise",
+            ),
+        )
+
+
 class Objective(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     exercise = models.ForeignKey(

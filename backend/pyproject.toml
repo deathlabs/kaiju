@@ -4,6 +4,7 @@ version = "0.1.0"
 dependencies = [
     "django-ninja",
     "psycopg2-binary",
+    "pydantic[email]>=2.13.4",
     "tzdata",
     "uvicorn",
 ]
