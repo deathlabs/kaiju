@@ -3,6 +3,8 @@ from uuid import UUID
 
 # Third party imports.
 from ninja import Router, Status
+from objectives.models import Objective
+from references.models import Reference
 
 # Local imports.
 from exercises.models import Exercise, Participant
@@ -64,14 +66,20 @@ def update_exercise(request, exercise_id: UUID, payload: ExerciseUpdateSchema):
 
     data = payload.model_dump(exclude_unset=True)
     reference_ids = data.pop("reference_ids", None)
+    objective_ids = data.pop("objective_ids", None)
 
     for field, value in data.items():
         setattr(exercise, field, value)
 
     exercise.save()
 
+    if objective_ids is not None:
+        objectives = Objective.objects.filter(id__in=objective_ids)
+        exercise.objectives.set(objectives)
+
     if reference_ids is not None:
-        exercise.references.set(reference_ids)
+        references = Reference.objects.filter(id__in=reference_ids)
+        exercise.references.set(references)
 
     return Status(200, exercise)
 

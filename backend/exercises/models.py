@@ -40,6 +40,11 @@ class Exercise(models.Model):
         related_name="exercises",
         blank=True,
     )
+    objectives = models.ManyToManyField(
+        "objectives.Objective",
+        related_name="exercises",
+        blank=True,
+    )
     type = models.CharField(
         max_length=30,
         choices=Type.choices,
@@ -92,25 +97,6 @@ class Participant(models.Model):
         )
 
 
-class Objective(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
-    exercise = models.ForeignKey(
-        Exercise,
-        on_delete=models.CASCADE,
-        related_name="objectives",
-    )
-    number = models.PositiveIntegerField()
-    description = models.TextField()
-
-    class Meta:
-        constraints = (
-            models.UniqueConstraint(
-                fields=["exercise", "number"],
-                name="unique_objective_number_per_exercise",
-            ),
-        )
-
-
 class FacilitatorQuestion(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     exercise = models.ForeignKey(
@@ -119,7 +105,7 @@ class FacilitatorQuestion(models.Model):
         on_delete=models.CASCADE,
     )
     related_objectives = models.ManyToManyField(
-        Objective,
+        "objectives.Objective",
         related_name="facilitator_questions",
         blank=True,
     )
@@ -147,7 +133,7 @@ class Event(models.Model):
     description = models.TextField()
     expected_actions = models.TextField()
     related_objectives = models.ManyToManyField(
-        Objective,
+        "objectives.Objective",
         related_name="events",
         blank=True,
     )

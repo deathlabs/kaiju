@@ -251,10 +251,33 @@ pass "Exercise schedule can be restored"
 
 section "PLANNING STEP 1: EXERCISE REFERENCES"
 
-if curl -sf "$BASE_URL/exercises/$EXERCISE_ID/" | jq -e 'has("references")' > /dev/null; then
-  pass "Exercise references are exposed"
+EXERCISE_REFERENCE_UPDATE=$(
+  curl -fsS \
+    -X PATCH "$BASE_URL/exercises/$EXERCISE_ID/" \
+    -H "Content-Type: application/json" \
+    -d "{
+      \"reference_ids\": [\"$REFERENCE_ID\"]
+    }"
+)
+
+if jq -e --arg id "$REFERENCE_ID" \
+  'any(.references[]; .id == $id)' \
+  <<< "$EXERCISE_REFERENCE_UPDATE" >/dev/null; then
+  pass "Reference can be associated with an exercise"
 else
-  gap "Exercise.references exists in the data model but is not exposed by the API"
+  fail "Reference was not associated with the exercise"
+fi
+
+EXERCISE_GET=$(
+  curl -fsS "$BASE_URL/exercises/$EXERCISE_ID/"
+)
+
+if jq -e --arg id "$REFERENCE_ID" \
+  'any(.references[]; .id == $id)' \
+  <<< "$EXERCISE_GET" >/dev/null; then
+  pass "Exercise exposes associated references"
+else
+  fail "Exercise does not expose associated references"
 fi
 
 # ---------------------------------------------------------------------------
@@ -263,10 +286,77 @@ fi
 
 section "PLANNING STEP 2: OBJECTIVES"
 
-if endpoint_exists "$BASE_URL/exercises/$EXERCISE_ID/objectives/"; then
-  pass "Objective API is exposed"
+OBJECTIVE_RESPONSE=$(
+  curl -fsS \
+    -X POST "$BASE_URL/objectives/" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "title": "Validate Incident Response Procedures",
+      "description": "Evaluate the team'\''s ability to detect, respond to, and coordinate during a cybersecurity incident."
+    }'
+)
+
+OBJECTIVE_ID=$(jq -er '.id' <<< "$OBJECTIVE_RESPONSE")
+
+assert_nonempty \
+  "$OBJECTIVE_ID" \
+  "Objective can be created"
+
+assert_eq \
+  "$(jq -r '.title' <<< "$OBJECTIVE_RESPONSE")" \
+  "Validate Incident Response Procedures" \
+  "Objective title is stored"
+
+OBJECTIVE_GET=$(
+  curl -fsS "$BASE_URL/objectives/$OBJECTIVE_ID/"
+)
+
+assert_eq \
+  "$(jq -r '.id' <<< "$OBJECTIVE_GET")" \
+  "$OBJECTIVE_ID" \
+  "Objective can be retrieved by ID"
+
+OBJECTIVE_PATCH=$(
+  curl -fsS \
+    -X PATCH "$BASE_URL/objectives/$OBJECTIVE_ID/" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "title": "Validate Cyber Incident Response Procedures"
+    }'
+)
+
+assert_eq \
+  "$(jq -r '.title' <<< "$OBJECTIVE_PATCH")" \
+  "Validate Cyber Incident Response Procedures" \
+  "Objective can be updated"
+
+EXERCISE_OBJECTIVE_UPDATE=$(
+  curl -fsS \
+    -X PATCH "$BASE_URL/exercises/$EXERCISE_ID/" \
+    -H "Content-Type: application/json" \
+    -d "{
+      \"objective_ids\": [\"$OBJECTIVE_ID\"]
+    }"
+)
+
+if jq -e --arg id "$OBJECTIVE_ID" \
+  'any(.objectives[]; .id == $id)' \
+  <<< "$EXERCISE_OBJECTIVE_UPDATE" >/dev/null; then
+  pass "Objective can be associated with an exercise"
 else
-  gap "Objective model exists but exercise objectives are not exposed by the API"
+  fail "Objective was not associated with the exercise"
+fi
+
+EXERCISE_GET=$(
+  curl -fsS "$BASE_URL/exercises/$EXERCISE_ID/"
+)
+
+if jq -e --arg id "$OBJECTIVE_ID" \
+  'any(.objectives[]; .id == $id)' \
+  <<< "$EXERCISE_GET" >/dev/null; then
+  pass "Exercise exposes associated objectives"
+else
+  fail "Exercise does not expose associated objectives"
 fi
 
 # ---------------------------------------------------------------------------
@@ -502,6 +592,7 @@ printf "Failed tests        : %d\n" "$FAIL"
 printf "API gaps            : %d\n" "$GAP"
 
 printf "\nExercise ID:  %s\n" "$EXERCISE_ID"
+printf "Objective ID: %s\n" "$OBJECTIVE_ID"
 printf "Reference ID: %s\n" "$REFERENCE_ID"
 
 if (( FAIL > 0 )); then
@@ -510,9 +601,9 @@ if (( FAIL > 0 )); then
 fi
 
 if (( GAP > 0 )); then
-  printf "\nRESULT: Existing API works, but does not completely expose the TTX workflow.\n"
+  printf "\nRESULT: Existing API works, but does not completely implement a TTX workflow.\n"
   exit 2
 fi
 
-printf "\nRESULT: API completely addresses the tested TTX workflow.\n"
+printf "\nRESULT: API completely addresses implements a TTX workflow.\n"
 exit 0
