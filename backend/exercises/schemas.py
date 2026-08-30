@@ -4,11 +4,12 @@ from uuid import UUID
 
 # Third party imports.
 from ninja import Schema
-
-# Local imports.
 from objectives.schemas import ObjectiveSchema
 from pydantic import EmailStr
 from references.schemas import ReferenceSchema
+
+# Local imports.
+from exercises.models import Exercise, Participant
 
 
 class BadRequestResponseSchema(Schema):
@@ -21,17 +22,16 @@ class ParticipantSchema(Schema):
     """The fields of a Participant."""
 
     id: UUID
-    exercise_id: UUID
     first_name: str
     last_name: str
     email: EmailStr
-    role: str
+    role: Participant.Role
 
 
 class ExerciseCreateSchema(Schema):
     """The fields required to create an Exercise."""
 
-    type: str
+    type: Exercise.Type
     start_date_time: datetime
     end_date_time: datetime
     title: str
@@ -41,17 +41,16 @@ class ExerciseCreateSchema(Schema):
 class ExerciseUpdateSchema(Schema):
     """The fields that can be updated on an Exercise."""
 
-    facilitator_ids: list[int] | None = None
     reference_ids: list[UUID] | None = None
     objective_ids: list[UUID] | None = None
-    type: str | None = None
+    type: Exercise.Type | None = None
     start_date_time: datetime | None = None
     end_date_time: datetime | None = None
     title: str | None = None
     scenario: str | None = None
     red_team_coordinated_at: datetime | None = None
     read_aheads_sent_at: datetime | None = None
-    status: str | None = None
+    status: Exercise.Status | None = None
 
 
 class ExerciseSchema(Schema):
@@ -59,22 +58,22 @@ class ExerciseSchema(Schema):
 
     id: UUID
     created_at: datetime
-    facilitator_ids: list[int]
+    participants: list[ParticipantSchema]
     references: list[ReferenceSchema]
     objectives: list[ObjectiveSchema]
-    type: str
+    type: Exercise.Type
     start_date_time: datetime
     end_date_time: datetime
     title: str
     scenario: str
     red_team_coordinated_at: datetime | None
     read_aheads_sent_at: datetime | None
-    status: str
+    status: Exercise.Status
     updated_at: datetime
 
     @staticmethod
-    def resolve_facilitator_ids(obj):
-        return list(obj.facilitators.values_list("id", flat=True))
+    def resolve_participants(obj):
+        return list(obj.participants.all())
 
 
 class NotFoundResponseSchema(Schema):
@@ -89,7 +88,7 @@ class ParticipantCreateSchema(Schema):
     first_name: str
     last_name: str
     email: EmailStr
-    role: str
+    role: Participant.Role
 
 
 class ParticipantUpdateSchema(Schema):
@@ -98,4 +97,4 @@ class ParticipantUpdateSchema(Schema):
     first_name: str | None = None
     last_name: str | None = None
     email: EmailStr | None = None
-    role: str | None = None
+    role: Participant.Role | None = None

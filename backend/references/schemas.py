@@ -4,6 +4,7 @@ from uuid import UUID
 
 # Third party imports.
 from ninja import Schema
+from pydantic import AnyHttpUrl
 
 
 class BadRequestResponseSchema(Schema):
@@ -16,14 +17,14 @@ class ReferenceCreateSchema(Schema):
     """The fields required to create a Reference."""
 
     title: str
-    url: str
+    url: AnyHttpUrl
 
 
 class ReferenceUpdateSchema(Schema):
     """The fields that can be updated on a Reference."""
 
     title: str | None = None
-    url: str | None = None
+    url: AnyHttpUrl | None = None
 
 
 class ReferenceSchema(Schema):
@@ -31,7 +32,7 @@ class ReferenceSchema(Schema):
 
     id: UUID
     title: str
-    url: str
+    url: AnyHttpUrl
     created_at: datetime
     updated_at: datetime
 

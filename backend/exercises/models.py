@@ -21,26 +21,25 @@ class Exercise(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
+
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         related_name="exercises_created",
         on_delete=models.PROTECT,
     )
-    facilitators = models.ManyToManyField(
-        settings.AUTH_USER_MODEL,
-        related_name="exercises_facilitated",
-        blank=True,
-    )
+
     references = models.ManyToManyField(
         "references.Reference",
         related_name="exercises",
         blank=True,
     )
+
     objectives = models.ManyToManyField(
         "objectives.Objective",
         related_name="exercises",
         blank=True,
     )
+
     type = models.CharField(
         max_length=30,
         choices=Type.choices,
@@ -52,22 +51,25 @@ class Exercise(models.Model):
     scenario = models.TextField()
     red_team_coordinated_at = models.DateTimeField(null=True, blank=True)
     read_aheads_sent_at = models.DateTimeField(null=True, blank=True)
+
     status = models.CharField(
         max_length=20,
         choices=Status.choices,
         default=Status.PLANNED,
     )
+
     updated_at = models.DateTimeField(auto_now=True)
 
 
 class Participant(models.Model):
     class Role(models.TextChoices):
+        FACILITATOR = "facilitator"
         ISO = "information_system_owner"
         ISSM = "information_system_security_manager"
         ISSO = "information_system_security_officer"
         SYSTEM_ADMINISTRATOR = "system_administrator"
-        CSSP = "cybersecurity_service_provider"
         USER = "user"
+        CSSP = "cybersecurity_service_provider"
         ATTACKER = "attacker"
 
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
