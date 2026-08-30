@@ -10,7 +10,7 @@ spec:
   network:
     expose:
       - service: backend
-        podLabels:
+        selector:
           app.kubernetes.io/component: backend
         host: kaiju
         port: 8000
@@ -31,3 +31,10 @@ spec:
         remoteSelector:
           app.kubernetes.io/component: backend
         port: 5432
+  sso:
+    - name: Kaiju
+      clientId: kaiju
+      redirectUris:
+        - https://kaiju.uds.dev/login
+      enableAuthserviceSelector:
+        app.kubernetes.io/component: backend
