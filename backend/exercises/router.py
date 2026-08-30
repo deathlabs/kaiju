@@ -30,6 +30,8 @@ router = Router(tags=["exercises"])
 @router.post("/", response={201: ExerciseSchema})
 def create_exercise(request, payload: ExerciseCreateSchema):
     """Create an exercise."""
+    print(dict(request.headers))
+
     exercise = Exercise.objects.create(
         created_by=request.user,
         **payload.model_dump(),
@@ -142,6 +144,7 @@ def delete_exercise(request, exercise_id: UUID):
 )
 def create_participant(request, exercise_id: UUID, payload: ParticipantCreateSchema):
     """Create a participant for an exercise."""
+
     try:
         exercise = Exercise.objects.get(id=exercise_id)
     except Exercise.DoesNotExist:
