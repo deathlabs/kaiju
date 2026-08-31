@@ -80,7 +80,10 @@ class Participant(models.Model):
     )
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
-    email = models.EmailField()
+    email = models.EmailField(
+        null=True,
+        blank=True,
+    )
     role = models.CharField(
         max_length=40,
         choices=Role.choices,

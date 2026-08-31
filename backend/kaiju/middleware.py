@@ -1,5 +1,4 @@
-# kaiju/middleware.py
-
+# Standard library imports
 import jwt
 from django.contrib.auth import get_user_model
 

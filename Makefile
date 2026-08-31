@@ -23,6 +23,25 @@ qa:
 	ruff format --exclude migrations
 
 # ---------------------------------------------------------
+# Reset Django migrations.
+# ---------------------------------------------------------
+
+.PHONY: migrations
+.SILENT: migrations
+
+migrations:
+	find backend \
+		-mindepth 3 -maxdepth 3 \
+		-path "*/migrations/*.py" \
+		! -name "__init__.py" \
+		-type f -delete
+	find backend \
+		-mindepth 3 -maxdepth 3 \
+		-path "*/migrations/__pycache__" \
+		-type d -exec rm -rf {} +
+	cd backend && SECRET_KEY=kaiju uv run python manage.py makemigrations
+
+# ---------------------------------------------------------
 # Build the containers.
 # ---------------------------------------------------------
 
@@ -69,8 +88,8 @@ status:
 .PHONY: deploy
 .SILENT: deploy
 
-deploy: remove build
-	uds zarf package create --confirm &&\
+deploy: build
+	uds zarf package create --confirm && \
 	uds zarf package deploy zarf-package-kaiju-amd64-0.1.0.tar.zst --confirm
 
 # ---------------------------------------------------------
@@ -79,25 +98,26 @@ deploy: remove build
 
 .PHONY: remove
 .SILENT: remove
-remove: 
-	uds zarf package remove kaiju --confirm || true
-	uds zarf tools kubectl delete namespace kaiju || true
+
+remove:
+	-uds zarf package remove kaiju --confirm
+	@if uds zarf tools kubectl get package.uds.dev kaiju -n kaiju >/dev/null 2>&1; then \
+		echo "Waiting for UDS package cleanup..."; \
+		uds zarf tools kubectl wait \
+			--for=delete package.uds.dev/kaiju \
+			-n kaiju \
+			--timeout=120s; \
+	fi
+	uds zarf tools kubectl delete namespace kaiju \
+		--ignore-not-found \
+		--wait=true \
+		--timeout=120s
 
 # ---------------------------------------------------------
-# Reset Django migrations.
+# Redeploy the Zarf package.
 # ---------------------------------------------------------
 
-.PHONY: migrations
-.SILENT: migrations
+.PHONY: redeploy
+.SILENT: redeploy
 
-migrations:
-	find backend \
-		-mindepth 3 -maxdepth 3 \
-		-path "*/migrations/*.py" \
-		! -name "__init__.py" \
-		-type f -delete
-	find backend \
-		-mindepth 3 -maxdepth 3 \
-		-path "*/migrations/__pycache__" \
-		-type d -exec rm -rf {} +
-	cd backend && uv run python manage.py makemigrations
+redeploy: remove deploy

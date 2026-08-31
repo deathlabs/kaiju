@@ -24,7 +24,7 @@ class ParticipantSchema(Schema):
     id: UUID
     first_name: str
     last_name: str
-    email: EmailStr
+    email: EmailStr | None = None
     role: Participant.Role
 
 
@@ -87,7 +87,7 @@ class ParticipantCreateSchema(Schema):
 
     first_name: str
     last_name: str
-    email: EmailStr
+    email: EmailStr | None = None
     role: Participant.Role
 
 

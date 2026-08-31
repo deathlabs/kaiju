@@ -2,21 +2,31 @@
 
 set -euo pipefail
 
-JWT=$(
-  cd backend
+BASE_URL="${BASE_URL:-https://kaiju.uds.dev/api/v1}"
+KEYCLOAK_URL="${KEYCLOAK_URL:-https://sso.uds.dev}"
+KEYCLOAK_REALM="${KEYCLOAK_REALM:-uds}"
+KEYCLOAK_CLIENT_ID="${KEYCLOAK_CLIENT_ID:-kaiju-uat}"
 
-  set -a
-  source .env
-  set +a
-
-  export PGHOST=localhost
-  uv run python manage.py shell -c \
-    'from django.contrib.auth import get_user_model; from ninja_jwt.tokens import RefreshToken; u=get_user_model().objects.first(); print(RefreshToken.for_user(u).access_token)' \
-    | tail -n 1
+KEYCLOAK_CLIENT_SECRET=$(
+  uds zarf tools kubectl get secret \
+    -n kaiju \
+    "sso-client-$KEYCLOAK_CLIENT_ID" \
+    -o jsonpath='{.data.secret}' \
+    | base64 -d
 )
 
-BASE_URL="${BASE_URL:-http://localhost:8000/api/v1}"
-JWT="${JWT:?JWT environment variable must be set}"
+JWT=$(
+  curl -fsS \
+    -X POST \
+    "$KEYCLOAK_URL/realms/$KEYCLOAK_REALM/protocol/openid-connect/token" \
+    -H "Content-Type: application/x-www-form-urlencoded" \
+    --data-urlencode "grant_type=client_credentials" \
+    --data-urlencode "client_id=$KEYCLOAK_CLIENT_ID" \
+    --data-urlencode "client_secret=$KEYCLOAK_CLIENT_SECRET" \
+    | jq -er '.access_token'
+)
+
+JWT="${JWT:?Failed to obtain Keycloak access token}"
 
 PASS=0
 FAIL=0
@@ -97,7 +107,7 @@ endpoint_exists() {
 
 section "API HEALTH"
 
-if curl -fsS "$BASE_URL/health/" >/dev/null; then
+if api_curl "$BASE_URL/health/" >/dev/null; then
   pass "API health endpoint responds"
 else
   fail "API health endpoint does not respond"
@@ -210,9 +220,13 @@ assert_eq \
   "planned" \
   "Exercise begins in planned state"
 
-assert_nonempty \
-  "$(jq -r '.facilitator_ids[0]' <<< "$EXERCISE_RESPONSE")" \
-  "Exercise creator is assigned as a facilitator"
+if jq -e \
+  'any(.participants[]; .role == "facilitator")' \
+  <<< "$EXERCISE_RESPONSE" >/dev/null; then
+  pass "Exercise creator is assigned as a facilitator"
+else
+  fail "Exercise creator is not assigned as a facilitator"
+fi
 
 # ---------------------------------------------------------------------------
 # Exercise Retrieval
@@ -500,13 +514,13 @@ PARTICIPANT_UPDATE=$(
     -X PATCH "$BASE_URL/exercises/$EXERCISE_ID/participants/$PARTICIPANT_ID/" \
     -H "Content-Type: application/json" \
     -d '{
-      "role": "department_lead"
+      "role": "system_administrator"
     }'
 )
 
 assert_eq \
   "$(jq -r '.role' <<< "$PARTICIPANT_UPDATE")" \
-  "department_lead" \
+  "system_administrator" \
   "Participant can be updated"
 
 READ_AHEAD_RESPONSE=$(
