@@ -5,7 +5,7 @@ set -euo pipefail
 BASE_URL="${BASE_URL:-https://kaiju.uds.dev/api/v1}"
 KEYCLOAK_URL="${KEYCLOAK_URL:-https://sso.uds.dev}"
 KEYCLOAK_REALM="${KEYCLOAK_REALM:-uds}"
-KEYCLOAK_CLIENT_ID="${KEYCLOAK_CLIENT_ID:-kaiju-uat}"
+KEYCLOAK_CLIENT_ID="${KEYCLOAK_CLIENT_ID:-kaiju-bot}"
 
 KEYCLOAK_CLIENT_SECRET=$(
   uds zarf tools kubectl get secret \

@@ -8,16 +8,25 @@ from objectives.models import Objective
 from references.models import Reference
 
 # Local imports.
-from exercises.models import Exercise, Participant
+from exercises.models import Event, Exercise, Inject, Participant, Question
 from exercises.schemas import (
     BadRequestResponseSchema,
+    EventCreateSchema,
+    EventSchema,
+    EventUpdateSchema,
     ExerciseCreateSchema,
     ExerciseSchema,
     ExerciseUpdateSchema,
+    InjectCreateSchema,
+    InjectSchema,
+    InjectUpdateSchema,
     NotFoundResponseSchema,
     ParticipantCreateSchema,
     ParticipantSchema,
     ParticipantUpdateSchema,
+    QuestionCreateSchema,
+    QuestionSchema,
+    QuestionUpdateSchema,
 )
 
 # Init the exercises router.
@@ -262,5 +271,408 @@ def delete_participant(request, exercise_id: UUID, participant_id: UUID):
             )
 
     participant.delete()
+
+    return Status(204, None)
+
+
+@router.post(
+    "/{exercise_id}/questions/",
+    response={
+        201: QuestionSchema,
+        404: NotFoundResponseSchema,
+    },
+)
+@transaction.atomic
+def create_question(
+    request,
+    exercise_id: UUID,
+    payload: QuestionCreateSchema,
+):
+    """Create a question for an exercise."""
+    try:
+        exercise = Exercise.objects.get(id=exercise_id)
+    except Exercise.DoesNotExist:
+        return Status(404, {"message": "Exercise not found"})
+
+    data = payload.model_dump()
+    objective_ids = data.pop("objective_ids")
+
+    question = Question.objects.create(
+        exercise=exercise,
+        **data,
+    )
+
+    objectives = Objective.objects.filter(id__in=objective_ids)
+    question.objectives.set(objectives)
+
+    return Status(201, question)
+
+
+@router.get(
+    "/{exercise_id}/questions/",
+    response={
+        200: list[QuestionSchema],
+        404: NotFoundResponseSchema,
+    },
+)
+def list_questions(request, exercise_id: UUID):
+    """Fetch all questions for an exercise."""
+    try:
+        exercise = Exercise.objects.get(id=exercise_id)
+    except Exercise.DoesNotExist:
+        return Status(404, {"message": "Exercise not found"})
+
+    return Status(
+        200,
+        Question.objects.filter(exercise=exercise),
+    )
+
+
+@router.get(
+    "/{exercise_id}/questions/{question_id}/",
+    response={
+        200: QuestionSchema,
+        404: NotFoundResponseSchema,
+    },
+)
+def get_question(
+    request,
+    exercise_id: UUID,
+    question_id: UUID,
+):
+    """Fetch a question."""
+    try:
+        question = Question.objects.get(
+            id=question_id,
+            exercise_id=exercise_id,
+        )
+    except Question.DoesNotExist:
+        return Status(404, {"message": "Question not found"})
+
+    return Status(200, question)
+
+
+@router.patch(
+    "/{exercise_id}/questions/{question_id}/",
+    response={
+        200: QuestionSchema,
+        404: NotFoundResponseSchema,
+    },
+)
+@transaction.atomic
+def update_question(
+    request,
+    exercise_id: UUID,
+    question_id: UUID,
+    payload: QuestionUpdateSchema,
+):
+    """Update a question."""
+    try:
+        question = Question.objects.get(
+            id=question_id,
+            exercise_id=exercise_id,
+        )
+    except Question.DoesNotExist:
+        return Status(404, {"message": "Question not found"})
+
+    data = payload.model_dump(exclude_unset=True)
+
+    objective_ids = data.pop("objective_ids", None)
+
+    for field, value in data.items():
+        setattr(question, field, value)
+
+    question.save()
+
+    if objective_ids is not None:
+        objectives = Objective.objects.filter(id__in=objective_ids)
+        question.objectives.set(objectives)
+
+    return Status(200, question)
+
+
+@router.delete(
+    "/{exercise_id}/questions/{question_id}/",
+    response={
+        204: None,
+        404: NotFoundResponseSchema,
+    },
+)
+def delete_question(
+    request,
+    exercise_id: UUID,
+    question_id: UUID,
+):
+    """Delete a question."""
+    try:
+        question = Question.objects.get(
+            id=question_id,
+            exercise_id=exercise_id,
+        )
+    except Question.DoesNotExist:
+        return Status(404, {"message": "Question not found"})
+
+    question.delete()
+
+    return Status(204, None)
+
+
+@router.post(
+    "/{exercise_id}/events/",
+    response={
+        201: EventSchema,
+        404: NotFoundResponseSchema,
+    },
+)
+@transaction.atomic
+def create_event(request, exercise_id: UUID, payload: EventCreateSchema):
+    """Create an event for an exercise."""
+    try:
+        exercise = Exercise.objects.get(id=exercise_id)
+    except Exercise.DoesNotExist:
+        return Status(404, {"message": "Exercise not found"})
+
+    data = payload.model_dump()
+    objective_ids = data.pop("objective_ids")
+
+    event = Event.objects.create(
+        exercise=exercise,
+        **data,
+    )
+
+    objectives = Objective.objects.filter(id__in=objective_ids)
+    event.objectives.set(objectives)
+
+    return Status(201, event)
+
+
+@router.get(
+    "/{exercise_id}/events/",
+    response={
+        200: list[EventSchema],
+        404: NotFoundResponseSchema,
+    },
+)
+def list_events(request, exercise_id: UUID):
+    """Fetch all events for an exercise."""
+    try:
+        exercise = Exercise.objects.get(id=exercise_id)
+    except Exercise.DoesNotExist:
+        return Status(404, {"message": "Exercise not found"})
+
+    return Status(
+        200,
+        Event.objects.filter(exercise=exercise),
+    )
+
+
+@router.get(
+    "/{exercise_id}/events/{event_id}/",
+    response={
+        200: EventSchema,
+        404: NotFoundResponseSchema,
+    },
+)
+def get_event(request, exercise_id: UUID, event_id: UUID):
+    """Fetch an event by its ID."""
+    try:
+        event = Event.objects.get(
+            id=event_id,
+            exercise_id=exercise_id,
+        )
+    except Event.DoesNotExist:
+        return Status(404, {"message": "Event not found"})
+
+    return Status(200, event)
+
+
+@router.patch(
+    "/{exercise_id}/events/{event_id}/",
+    response={
+        200: EventSchema,
+        404: NotFoundResponseSchema,
+    },
+)
+@transaction.atomic
+def update_event(
+    request,
+    exercise_id: UUID,
+    event_id: UUID,
+    payload: EventUpdateSchema,
+):
+    """Update an event."""
+    try:
+        event = Event.objects.get(
+            id=event_id,
+            exercise_id=exercise_id,
+        )
+    except Event.DoesNotExist:
+        return Status(404, {"message": "Event not found"})
+
+    data = payload.model_dump(exclude_unset=True)
+
+    objective_ids = data.pop("objective_ids", None)
+
+    for field, value in data.items():
+        setattr(event, field, value)
+
+    event.save()
+
+    if objective_ids is not None:
+        objectives = Objective.objects.filter(id__in=objective_ids)
+        event.objectives.set(objectives)
+
+    return Status(200, event)
+
+
+@router.delete(
+    "/{exercise_id}/events/{event_id}/",
+    response={
+        204: None,
+        404: NotFoundResponseSchema,
+    },
+)
+def delete_event(request, exercise_id: UUID, event_id: UUID):
+    """Delete an event."""
+    try:
+        event = Event.objects.get(
+            id=event_id,
+            exercise_id=exercise_id,
+        )
+    except Event.DoesNotExist:
+        return Status(404, {"message": "Event not found"})
+
+    event.delete()
+
+    return Status(204, None)
+
+
+@router.post(
+    "/{exercise_id}/events/{event_id}/injects/",
+    response={
+        201: InjectSchema,
+        404: NotFoundResponseSchema,
+    },
+)
+def create_inject(
+    request,
+    exercise_id: UUID,
+    event_id: UUID,
+    payload: InjectCreateSchema,
+):
+    """Create an inject for an event."""
+    try:
+        event = Event.objects.get(
+            id=event_id,
+            exercise_id=exercise_id,
+        )
+    except Event.DoesNotExist:
+        return Status(404, {"message": "Event not found"})
+
+    inject = Inject.objects.create(
+        event=event,
+        **payload.model_dump(),
+    )
+
+    return Status(201, inject)
+
+
+@router.get(
+    "/{exercise_id}/events/{event_id}/injects/",
+    response={
+        200: list[InjectSchema],
+        404: NotFoundResponseSchema,
+    },
+)
+def list_injects(request, exercise_id: UUID, event_id: UUID):
+    """Fetch all injects for an event."""
+    try:
+        event = Event.objects.get(
+            id=event_id,
+            exercise_id=exercise_id,
+        )
+    except Event.DoesNotExist:
+        return Status(404, {"message": "Event not found"})
+
+    return Status(
+        200,
+        Inject.objects.filter(event=event),
+    )
+
+
+@router.get(
+    "/{exercise_id}/events/{event_id}/injects/{inject_id}/",
+    response={
+        200: InjectSchema,
+        404: NotFoundResponseSchema,
+    },
+)
+def get_inject(request, exercise_id: UUID, event_id: UUID, inject_id: UUID):
+    """Fetch an inject by its ID."""
+    try:
+        inject = Inject.objects.get(
+            id=inject_id,
+            event_id=event_id,
+            event__exercise_id=exercise_id,
+        )
+    except Inject.DoesNotExist:
+        return Status(404, {"message": "Inject not found"})
+
+    return Status(200, inject)
+
+
+@router.patch(
+    "/{exercise_id}/events/{event_id}/injects/{inject_id}/",
+    response={
+        200: InjectSchema,
+        404: NotFoundResponseSchema,
+    },
+)
+def update_inject(
+    request,
+    exercise_id: UUID,
+    event_id: UUID,
+    inject_id: UUID,
+    payload: InjectUpdateSchema,
+):
+    """Update an inject."""
+    try:
+        inject = Inject.objects.get(
+            id=inject_id,
+            event_id=event_id,
+            event__exercise_id=exercise_id,
+        )
+    except Inject.DoesNotExist:
+        return Status(404, {"message": "Inject not found"})
+
+    data = payload.model_dump(exclude_unset=True)
+
+    for field, value in data.items():
+        setattr(inject, field, value)
+
+    inject.save()
+
+    return Status(200, inject)
+
+
+@router.delete(
+    "/{exercise_id}/events/{event_id}/injects/{inject_id}/",
+    response={
+        204: None,
+        404: NotFoundResponseSchema,
+    },
+)
+def delete_inject(request, exercise_id: UUID, event_id: UUID, inject_id: UUID):
+    """Delete an inject."""
+    try:
+        inject = Inject.objects.get(
+            id=inject_id,
+            event_id=event_id,
+            event__exercise_id=exercise_id,
+        )
+    except Inject.DoesNotExist:
+        return Status(404, {"message": "Inject not found"})
+
+    inject.delete()
 
     return Status(204, None)

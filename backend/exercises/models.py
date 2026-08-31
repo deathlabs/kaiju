@@ -21,25 +21,21 @@ class Exercise(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
-
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         related_name="exercises_created",
         on_delete=models.PROTECT,
     )
-
     references = models.ManyToManyField(
         "references.Reference",
         related_name="exercises",
         blank=True,
     )
-
     objectives = models.ManyToManyField(
         "objectives.Objective",
         related_name="exercises",
         blank=True,
     )
-
     type = models.CharField(
         max_length=30,
         choices=Type.choices,
@@ -51,13 +47,11 @@ class Exercise(models.Model):
     scenario = models.TextField()
     red_team_coordinated_at = models.DateTimeField(null=True, blank=True)
     read_aheads_sent_at = models.DateTimeField(null=True, blank=True)
-
     status = models.CharField(
         max_length=20,
         choices=Status.choices,
         default=Status.PLANNED,
     )
-
     updated_at = models.DateTimeField(auto_now=True)
 
 
@@ -73,6 +67,8 @@ class Participant(models.Model):
         ATTACKER = "attacker"
 
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     exercise = models.ForeignKey(
         Exercise,
         related_name="participants",
@@ -98,42 +94,50 @@ class Participant(models.Model):
         )
 
 
-class FacilitatorQuestion(models.Model):
+class Question(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
     exercise = models.ForeignKey(
         Exercise,
-        related_name="facilitator_questions",
+        related_name="questions",
         on_delete=models.CASCADE,
     )
-    related_objectives = models.ManyToManyField(
+
+    number = models.PositiveIntegerField()
+    text = models.TextField()
+    expected_answer = models.TextField(blank=True)
+    actual_answer = models.TextField(null=True, blank=True)
+
+    objectives = models.ManyToManyField(
         "objectives.Objective",
-        related_name="facilitator_questions",
+        related_name="questions",
         blank=True,
     )
-    question = models.TextField()
-    number = models.PositiveIntegerField()
-    expected_answer = models.TextField(blank=True)
 
     class Meta:
         constraints = (
             models.UniqueConstraint(
                 fields=["exercise", "number"],
-                name="unique_facilitator_question_number_per_exercise",
+                name="unique_question_number_per_exercise",
             ),
         )
 
 
 class Event(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     exercise = models.ForeignKey(
         Exercise,
         related_name="events",
         on_delete=models.CASCADE,
     )
     number = models.PositiveIntegerField()
-    description = models.TextField()
+    description = models.CharField(max_length=255)
     expected_actions = models.TextField()
-    related_objectives = models.ManyToManyField(
+    objectives = models.ManyToManyField(
         "objectives.Objective",
         related_name="events",
         blank=True,
@@ -156,6 +160,8 @@ class Inject(models.Model):
         CHAT_MESSAGE = "chat_message"
 
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     event = models.ForeignKey(
         Event,
         related_name="injects",

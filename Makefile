@@ -48,7 +48,7 @@ migrations:
 .PHONY: build
 .SILENT: build
 
-build: qa
+build: qa migrations
 	docker compose --profile $(DOCKER_COMPOSE_PROFILE) build
 
 # ---------------------------------------------------------
@@ -106,12 +106,12 @@ remove:
 		uds zarf tools kubectl wait \
 			--for=delete package.uds.dev/kaiju \
 			-n kaiju \
-			--timeout=60s; \
+			--timeout=120s; \
 	fi
 	uds zarf tools kubectl delete namespace kaiju \
 		--ignore-not-found \
 		--wait=true \
-		--timeout=60s
+		--timeout=120s
 
 # ---------------------------------------------------------
 # Redeploy the Zarf package.

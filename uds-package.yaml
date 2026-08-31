@@ -38,8 +38,8 @@ spec:
         - https://kaiju.uds.dev/login
       enableAuthserviceSelector:
         app.kubernetes.io/component: backend
-    - name: Kaiju UAT
-      clientId: kaiju-uat
+    - name: Kaiju Bot
+      clientId: kaiju-bot
       standardFlowEnabled: false
       serviceAccountsEnabled: true
       protocolMappers:

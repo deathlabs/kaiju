@@ -11,10 +11,10 @@ from references.router import router as references_router
 from .health import api as health_api
 
 api = NinjaAPI()
+api.add_router("/health/", health_api)
 api.add_router("/exercises/", exercises_router)
 api.add_router("/objectives/", objectives_router)
 api.add_router("/references/", references_router)
-api.add_router("/health/", health_api)
 
 urlpatterns = [
     path("admin/", admin.site.urls),
