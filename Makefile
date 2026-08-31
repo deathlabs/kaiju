@@ -106,12 +106,12 @@ remove:
 		uds zarf tools kubectl wait \
 			--for=delete package.uds.dev/kaiju \
 			-n kaiju \
-			--timeout=120s; \
+			--timeout=60s; \
 	fi
 	uds zarf tools kubectl delete namespace kaiju \
 		--ignore-not-found \
 		--wait=true \
-		--timeout=120s
+		--timeout=60s
 
 # ---------------------------------------------------------
 # Redeploy the Zarf package.
