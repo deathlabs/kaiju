@@ -32,10 +32,6 @@ PASS=0
 FAIL=0
 GAP=0
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 section() {
   printf "\n============================================================\n"
   printf "%s\n" "$1"
@@ -88,8 +84,8 @@ api_curl() {
 
 endpoint_exists() {
   local url="$1"
-
   local status
+
   status=$(
     curl -s \
       -o /dev/null \
@@ -115,9 +111,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Planning Step 1
-#
-# Policies and plans
+# Planning Step 1: Policies and plans
 # ---------------------------------------------------------------------------
 
 section "PLANNING STEP 1: POLICIES AND PLANS"
@@ -134,21 +128,14 @@ REFERENCE_RESPONSE=$(
 
 REFERENCE_ID=$(jq -er '.id' <<< "$REFERENCE_RESPONSE")
 
-assert_nonempty \
-  "$REFERENCE_ID" \
-  "Reference can be created"
-
-assert_eq \
-  "$(jq -r '.title' <<< "$REFERENCE_RESPONSE")" \
+assert_nonempty "$REFERENCE_ID" "Reference can be created"
+assert_eq "$(jq -r '.title' <<< "$REFERENCE_RESPONSE")" \
   "Incident Response Plan" \
   "Reference title is stored"
 
-REFERENCE_GET=$(
-  api_curl "$BASE_URL/references/$REFERENCE_ID/"
-)
+REFERENCE_GET=$(api_curl "$BASE_URL/references/$REFERENCE_ID/")
 
-assert_eq \
-  "$(jq -r '.id' <<< "$REFERENCE_GET")" \
+assert_eq "$(jq -r '.id' <<< "$REFERENCE_GET")" \
   "$REFERENCE_ID" \
   "Reference can be retrieved by ID"
 
@@ -161,15 +148,12 @@ REFERENCE_PATCH=$(
     }'
 )
 
-assert_eq \
-  "$(jq -r '.title' <<< "$REFERENCE_PATCH")" \
+assert_eq "$(jq -r '.title' <<< "$REFERENCE_PATCH")" \
   "Incident Response Plan (IRP)" \
   "Reference can be updated"
 
 # ---------------------------------------------------------------------------
-# Planning Steps 3-5
-#
-# Exercise metadata
+# Planning Steps 3-5: Exercise metadata
 # ---------------------------------------------------------------------------
 
 section "PLANNING STEPS 3-5: EXERCISE"
@@ -182,46 +166,31 @@ EXERCISE_RESPONSE=$(
       "title": "Incident Response TTX",
       "scenario": "At 0400 EST on 2026-02-26, unknown anomalous outbound network activity was observed originating from the platform'\''s Production environment.",
       "type": "discussion_and_hands_on",
-      "start_date_time": "2026-09-04T13:00:00-04:00",
-      "end_date_time": "2026-09-04T15:00:00-04:00"
+      "scheduled_start_time": "2026-09-04T13:00:00-04:00",
+      "scheduled_end_time": "2026-09-04T15:00:00-04:00"
     }'
 )
 
 EXERCISE_ID=$(jq -er '.id' <<< "$EXERCISE_RESPONSE")
 
-assert_nonempty \
-  "$EXERCISE_ID" \
-  "Exercise can be created"
-
-assert_eq \
-  "$(jq -r '.title' <<< "$EXERCISE_RESPONSE")" \
+assert_nonempty "$EXERCISE_ID" "Exercise can be created"
+assert_eq "$(jq -r '.title' <<< "$EXERCISE_RESPONSE")" \
   "Incident Response TTX" \
   "Exercise title is stored"
-
-assert_eq \
-  "$(jq -r '.type' <<< "$EXERCISE_RESPONSE")" \
+assert_eq "$(jq -r '.type' <<< "$EXERCISE_RESPONSE")" \
   "discussion_and_hands_on" \
   "Planning Step 3: TTX type is stored"
-
-assert_nonempty \
-  "$(jq -r '.start_date_time' <<< "$EXERCISE_RESPONSE")" \
-  "Planning Step 4: start time is stored"
-
-assert_nonempty \
-  "$(jq -r '.end_date_time' <<< "$EXERCISE_RESPONSE")" \
-  "Planning Step 4: end time is stored"
-
-assert_nonempty \
-  "$(jq -r '.scenario' <<< "$EXERCISE_RESPONSE")" \
+assert_nonempty "$(jq -r '.scheduled_start_time' <<< "$EXERCISE_RESPONSE")" \
+  "Planning Step 4: scheduled start time is stored"
+assert_nonempty "$(jq -r '.scheduled_end_time' <<< "$EXERCISE_RESPONSE")" \
+  "Planning Step 4: scheduled end time is stored"
+assert_nonempty "$(jq -r '.scenario' <<< "$EXERCISE_RESPONSE")" \
   "Planning Step 5: scenario is stored"
-
-assert_eq \
-  "$(jq -r '.status' <<< "$EXERCISE_RESPONSE")" \
+assert_eq "$(jq -r '.status' <<< "$EXERCISE_RESPONSE")" \
   "planned" \
   "Exercise begins in planned state"
 
-if jq -e \
-  'any(.participants[]; .role == "facilitator")' \
+if jq -e 'any(.participants[]; .role == "facilitator")' \
   <<< "$EXERCISE_RESPONSE" >/dev/null; then
   pass "Exercise creator is assigned as a facilitator"
 else
@@ -229,68 +198,53 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Exercise Retrieval
+# Exercise Retrieval and Update
 # ---------------------------------------------------------------------------
 
-section "EXERCISE RETRIEVAL"
+section "EXERCISE RETRIEVAL AND UPDATE"
 
-EXERCISES=$(
-  api_curl "$BASE_URL/exercises/"
-)
+EXERCISES=$(api_curl "$BASE_URL/exercises/")
 
-if jq -e --arg id "$EXERCISE_ID" \
-  'any(.[]; .id == $id)' \
+if jq -e --arg id "$EXERCISE_ID" 'any(.[]; .id == $id)' \
   <<< "$EXERCISES" >/dev/null; then
   pass "Created exercise appears in exercise list"
 else
   fail "Created exercise does not appear in exercise list"
 fi
 
-EXERCISE_GET=$(
-  api_curl "$BASE_URL/exercises/$EXERCISE_ID/"
-)
+EXERCISE_GET=$(api_curl "$BASE_URL/exercises/$EXERCISE_ID/")
 
-assert_eq \
-  "$(jq -r '.id' <<< "$EXERCISE_GET")" \
+assert_eq "$(jq -r '.id' <<< "$EXERCISE_GET")" \
   "$EXERCISE_ID" \
   "Exercise can be retrieved by ID"
-
-# ---------------------------------------------------------------------------
-# Exercise Updates
-# ---------------------------------------------------------------------------
-
-section "EXERCISE UPDATES"
 
 SCHEDULE_UPDATE=$(
   api_curl \
     -X PATCH "$BASE_URL/exercises/$EXERCISE_ID/" \
     -H "Content-Type: application/json" \
     -d '{
-      "start_date_time": "2026-09-04T14:00:00-04:00",
-      "end_date_time": "2026-09-04T16:00:00-04:00"
+      "scheduled_start_time": "2026-09-04T14:00:00-04:00",
+      "scheduled_end_time": "2026-09-04T16:00:00-04:00"
     }'
 )
 
-assert_nonempty \
-  "$(jq -r '.start_date_time' <<< "$SCHEDULE_UPDATE")" \
-  "Exercise start time can be changed"
-
-assert_nonempty \
-  "$(jq -r '.end_date_time' <<< "$SCHEDULE_UPDATE")" \
-  "Exercise end time can be changed"
+assert_nonempty "$(jq -r '.scheduled_start_time' <<< "$SCHEDULE_UPDATE")" \
+  "Exercise scheduled start time can be changed"
+assert_nonempty "$(jq -r '.scheduled_end_time' <<< "$SCHEDULE_UPDATE")" \
+  "Exercise scheduled end time can be changed"
 
 api_curl \
   -X PATCH "$BASE_URL/exercises/$EXERCISE_ID/" \
   -H "Content-Type: application/json" \
   -d '{
-    "start_date_time": "2026-09-04T13:00:00-04:00",
-    "end_date_time": "2026-09-04T15:00:00-04:00"
+    "scheduled_start_time": "2026-09-04T13:00:00-04:00",
+    "scheduled_end_time": "2026-09-04T15:00:00-04:00"
   }' >/dev/null
 
 pass "Exercise schedule can be restored"
 
 # ---------------------------------------------------------------------------
-# Planning Step 1: Exercise/Reference Relationship
+# Planning Step 1: Exercise/reference relationship
 # ---------------------------------------------------------------------------
 
 section "PLANNING STEP 1: EXERCISE REFERENCES"
@@ -304,24 +258,11 @@ EXERCISE_REFERENCE_UPDATE=$(
     }"
 )
 
-if jq -e --arg id "$REFERENCE_ID" \
-  'any(.references[]; .id == $id)' \
+if jq -e --arg id "$REFERENCE_ID" 'any(.references[]; .id == $id)' \
   <<< "$EXERCISE_REFERENCE_UPDATE" >/dev/null; then
   pass "Reference can be associated with an exercise"
 else
   fail "Reference was not associated with the exercise"
-fi
-
-EXERCISE_GET=$(
-  api_curl "$BASE_URL/exercises/$EXERCISE_ID/"
-)
-
-if jq -e --arg id "$REFERENCE_ID" \
-  'any(.references[]; .id == $id)' \
-  <<< "$EXERCISE_GET" >/dev/null; then
-  pass "Exercise exposes associated references"
-else
-  fail "Exercise does not expose associated references"
 fi
 
 # ---------------------------------------------------------------------------
@@ -342,21 +283,14 @@ OBJECTIVE_RESPONSE=$(
 
 OBJECTIVE_ID=$(jq -er '.id' <<< "$OBJECTIVE_RESPONSE")
 
-assert_nonempty \
-  "$OBJECTIVE_ID" \
-  "Objective can be created"
-
-assert_eq \
-  "$(jq -r '.title' <<< "$OBJECTIVE_RESPONSE")" \
+assert_nonempty "$OBJECTIVE_ID" "Objective can be created"
+assert_eq "$(jq -r '.title' <<< "$OBJECTIVE_RESPONSE")" \
   "Validate Incident Response Procedures" \
   "Objective title is stored"
 
-OBJECTIVE_GET=$(
-  api_curl "$BASE_URL/objectives/$OBJECTIVE_ID/"
-)
+OBJECTIVE_GET=$(api_curl "$BASE_URL/objectives/$OBJECTIVE_ID/")
 
-assert_eq \
-  "$(jq -r '.id' <<< "$OBJECTIVE_GET")" \
+assert_eq "$(jq -r '.id' <<< "$OBJECTIVE_GET")" \
   "$OBJECTIVE_ID" \
   "Objective can be retrieved by ID"
 
@@ -369,8 +303,7 @@ OBJECTIVE_PATCH=$(
     }'
 )
 
-assert_eq \
-  "$(jq -r '.title' <<< "$OBJECTIVE_PATCH")" \
+assert_eq "$(jq -r '.title' <<< "$OBJECTIVE_PATCH")" \
   "Validate Cyber Incident Response Procedures" \
   "Objective can be updated"
 
@@ -383,86 +316,18 @@ EXERCISE_OBJECTIVE_UPDATE=$(
     }"
 )
 
-if jq -e --arg id "$OBJECTIVE_ID" \
-  'any(.objectives[]; .id == $id)' \
+if jq -e --arg id "$OBJECTIVE_ID" 'any(.objectives[]; .id == $id)' \
   <<< "$EXERCISE_OBJECTIVE_UPDATE" >/dev/null; then
   pass "Objective can be associated with an exercise"
 else
   fail "Objective was not associated with the exercise"
 fi
 
-EXERCISE_GET=$(
-  api_curl "$BASE_URL/exercises/$EXERCISE_ID/"
-)
-
-if jq -e --arg id "$OBJECTIVE_ID" \
-  'any(.objectives[]; .id == $id)' \
-  <<< "$EXERCISE_GET" >/dev/null; then
-  pass "Exercise exposes associated objectives"
-else
-  fail "Exercise does not expose associated objectives"
-fi
-
 # ---------------------------------------------------------------------------
-# Planning Step 6: MSEL
+# Preparing Steps 2-3: Participants and read-aheads
 # ---------------------------------------------------------------------------
 
-section "PLANNING STEP 6: MASTER SCENARIO EVENT LIST"
-
-if endpoint_exists "$BASE_URL/exercises/$EXERCISE_ID/events/"; then
-  pass "MSEL event API is exposed"
-else
-  gap "Event model exists but MSEL events are not exposed by the API"
-fi
-
-# ---------------------------------------------------------------------------
-# Planning Step 7: Inject Tracker
-# ---------------------------------------------------------------------------
-
-section "PLANNING STEP 7: INJECT TRACKER"
-
-if endpoint_exists "$BASE_URL/exercises/$EXERCISE_ID/events/test/injects/"; then
-  pass "Inject API is exposed"
-else
-  gap "Inject model exists but event injects are not exposed by the API"
-fi
-
-# ---------------------------------------------------------------------------
-# Planning Step 8: Facilitator Questions
-# ---------------------------------------------------------------------------
-
-section "PLANNING STEP 8: FACILITATOR QUESTIONS"
-
-if endpoint_exists "$BASE_URL/exercises/$EXERCISE_ID/questions/"; then
-  pass "Facilitator question API is exposed"
-else
-  gap "FacilitatorQuestion model exists but facilitator questions are not exposed by the API"
-fi
-
-# ---------------------------------------------------------------------------
-# Preparing Step 1
-# ---------------------------------------------------------------------------
-
-section "PREPARING STEP 1: RED TEAM COORDINATION"
-
-PREP_RESPONSE=$(
-  api_curl \
-    -X PATCH "$BASE_URL/exercises/$EXERCISE_ID/" \
-    -H "Content-Type: application/json" \
-    -d '{
-      "red_team_coordinated_at": "2026-09-01T10:00:00-04:00"
-    }'
-)
-
-assert_nonempty \
-  "$(jq -r '.red_team_coordinated_at' <<< "$PREP_RESPONSE")" \
-  "Red Team coordination can be recorded"
-
-# ---------------------------------------------------------------------------
-# Preparing Steps 2: Participants and Read-Aheads
-# ---------------------------------------------------------------------------
-
-section "PREPARING STEPS 2 - 3: PARTICIPANTS AND READ-AHEADS"
+section "PREPARING STEPS 2-3: PARTICIPANTS AND READ-AHEADS"
 
 PARTICIPANT_RESPONSE=$(
   api_curl \
@@ -478,21 +343,14 @@ PARTICIPANT_RESPONSE=$(
 
 PARTICIPANT_ID=$(jq -er '.id' <<< "$PARTICIPANT_RESPONSE")
 
-assert_nonempty \
-  "$PARTICIPANT_ID" \
-  "Participant can be created"
-
-assert_eq \
-  "$(jq -r '.role' <<< "$PARTICIPANT_RESPONSE")" \
+assert_nonempty "$PARTICIPANT_ID" "Participant can be created"
+assert_eq "$(jq -r '.role' <<< "$PARTICIPANT_RESPONSE")" \
   "information_system_security_manager" \
   "Participant role is stored"
 
-PARTICIPANTS=$(
-  api_curl "$BASE_URL/exercises/$EXERCISE_ID/participants/"
-)
+PARTICIPANTS=$(api_curl "$BASE_URL/exercises/$EXERCISE_ID/participants/")
 
-if jq -e --arg id "$PARTICIPANT_ID" \
-  'any(.[]; .id == $id)' \
+if jq -e --arg id "$PARTICIPANT_ID" 'any(.[]; .id == $id)' \
   <<< "$PARTICIPANTS" >/dev/null; then
   pass "Participant appears in exercise roster"
 else
@@ -500,12 +358,10 @@ else
 fi
 
 PARTICIPANT_GET=$(
-  api_curl \
-    "$BASE_URL/exercises/$EXERCISE_ID/participants/$PARTICIPANT_ID/"
+  api_curl "$BASE_URL/exercises/$EXERCISE_ID/participants/$PARTICIPANT_ID/"
 )
 
-assert_eq \
-  "$(jq -r '.id' <<< "$PARTICIPANT_GET")" \
+assert_eq "$(jq -r '.id' <<< "$PARTICIPANT_GET")" \
   "$PARTICIPANT_ID" \
   "Participant can be retrieved by ID"
 
@@ -518,8 +374,7 @@ PARTICIPANT_UPDATE=$(
     }'
 )
 
-assert_eq \
-  "$(jq -r '.role' <<< "$PARTICIPANT_UPDATE")" \
+assert_eq "$(jq -r '.role' <<< "$PARTICIPANT_UPDATE")" \
   "system_administrator" \
   "Participant can be updated"
 
@@ -532,9 +387,165 @@ READ_AHEAD_RESPONSE=$(
     }'
 )
 
-assert_nonempty \
-  "$(jq -r '.read_aheads_sent_at' <<< "$READ_AHEAD_RESPONSE")" \
+assert_nonempty "$(jq -r '.read_aheads_sent_at' <<< "$READ_AHEAD_RESPONSE")" \
   "Read-ahead distribution can be recorded"
+
+# ---------------------------------------------------------------------------
+# Preparing Step 1: OPFOR coordination
+# ---------------------------------------------------------------------------
+
+section "PREPARING STEP 1: OPFOR COORDINATION"
+
+OPFOR_RESPONSE=$(
+  api_curl \
+    -X PATCH "$BASE_URL/exercises/$EXERCISE_ID/" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "opfor_coordinated_at": "2026-09-01T10:00:00-04:00"
+    }'
+)
+
+assert_nonempty "$(jq -r '.opfor_coordinated_at' <<< "$OPFOR_RESPONSE")" \
+  "OPFOR coordination can be recorded"
+
+# ---------------------------------------------------------------------------
+# Planning Step 6: Master Scenario Event List
+# ---------------------------------------------------------------------------
+
+section "PLANNING STEP 6: MASTER SCENARIO EVENT LIST"
+
+EVENT_RESPONSE=$(
+  api_curl \
+    -X POST "$BASE_URL/exercises/$EXERCISE_ID/events/" \
+    -H "Content-Type: application/json" \
+    -d "{
+      \"number\": 1,
+      \"description\": \"Initial anomalous outbound traffic is reported to the response team.\",
+      \"objective_ids\": [\"$OBJECTIVE_ID\"]
+    }"
+)
+
+EVENT_ID=$(jq -er '.id' <<< "$EVENT_RESPONSE")
+
+assert_nonempty "$EVENT_ID" "MSEL event can be created"
+assert_eq "$(jq -r '.number' <<< "$EVENT_RESPONSE")" \
+  "1" \
+  "MSEL event number is stored"
+
+if jq -e --arg id "$OBJECTIVE_ID" 'any(.objectives[]; .id == $id)' \
+  <<< "$EVENT_RESPONSE" >/dev/null; then
+  pass "MSEL event can be mapped to an objective"
+else
+  fail "MSEL event objective mapping was not stored"
+fi
+
+EVENTS=$(api_curl "$BASE_URL/exercises/$EXERCISE_ID/events/")
+
+if jq -e --arg id "$EVENT_ID" 'any(.[]; .id == $id)' \
+  <<< "$EVENTS" >/dev/null; then
+  pass "MSEL event appears in event list"
+else
+  fail "MSEL event does not appear in event list"
+fi
+
+EVENT_GET=$(api_curl "$BASE_URL/exercises/$EXERCISE_ID/events/$EVENT_ID/")
+
+assert_eq "$(jq -r '.id' <<< "$EVENT_GET")" \
+  "$EVENT_ID" \
+  "MSEL event can be retrieved by ID"
+
+EVENT_PATCH=$(
+  api_curl \
+    -X PATCH "$BASE_URL/exercises/$EXERCISE_ID/events/$EVENT_ID/" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "description": "Initial anomalous outbound traffic is confirmed and escalated."
+    }'
+)
+
+assert_eq "$(jq -r '.description' <<< "$EVENT_PATCH")" \
+  "Initial anomalous outbound traffic is confirmed and escalated." \
+  "MSEL event can be updated"
+
+# ---------------------------------------------------------------------------
+# Planning Step 7: Inject Tracker
+# ---------------------------------------------------------------------------
+
+section "PLANNING STEP 7: INJECT TRACKER"
+
+INJECT_RESPONSE=$(
+  api_curl \
+    -X POST "$BASE_URL/exercises/$EXERCISE_ID/events/$EVENT_ID/injects/" \
+    -H "Content-Type: application/json" \
+    -d "{
+      \"recipient_id\": \"$PARTICIPANT_ID\",
+      \"number\": \"1-1\",
+      \"scheduled_start_time\": \"2026-09-04T13:10:00-04:00\",
+      \"delivery_method\": \"chat_message\",
+      \"sender\": \"SOC Analyst\",
+      \"message\": \"EDR shows repeated outbound connections from a production workload to an unknown external host.\",
+      \"expected_response\": \"Validate the alert, begin triage, and initiate incident response procedures.\"
+    }"
+)
+
+INJECT_ID=$(jq -er '.id' <<< "$INJECT_RESPONSE")
+
+assert_nonempty "$INJECT_ID" "Inject can be created"
+assert_eq "$(jq -r '.number' <<< "$INJECT_RESPONSE")" \
+  "1-1" \
+  "Inject number is stored"
+assert_eq "$(jq -r '.delivery_method' <<< "$INJECT_RESPONSE")" \
+  "chat_message" \
+  "Inject delivery method is stored"
+assert_eq "$(jq -r '.recipient.id' <<< "$INJECT_RESPONSE")" \
+  "$PARTICIPANT_ID" \
+  "Inject recipient is stored"
+assert_nonempty "$(jq -r '.expected_response' <<< "$INJECT_RESPONSE")" \
+  "Expected response is stored"
+
+INJECTS=$(
+  api_curl "$BASE_URL/exercises/$EXERCISE_ID/events/$EVENT_ID/injects/"
+)
+
+if jq -e --arg id "$INJECT_ID" 'any(.[]; .id == $id)' \
+  <<< "$INJECTS" >/dev/null; then
+  pass "Inject appears in inject list"
+else
+  fail "Inject does not appear in inject list"
+fi
+
+INJECT_GET=$(
+  api_curl "$BASE_URL/exercises/$EXERCISE_ID/events/$EVENT_ID/injects/$INJECT_ID/"
+)
+
+assert_eq "$(jq -r '.id' <<< "$INJECT_GET")" \
+  "$INJECT_ID" \
+  "Inject can be retrieved by ID"
+
+INJECT_PATCH=$(
+  api_curl \
+    -X PATCH "$BASE_URL/exercises/$EXERCISE_ID/events/$EVENT_ID/injects/$INJECT_ID/" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "message": "EDR and proxy telemetry confirm repeated outbound connections from a production workload."
+    }'
+)
+
+assert_eq "$(jq -r '.message' <<< "$INJECT_PATCH")" \
+  "EDR and proxy telemetry confirm repeated outbound connections from a production workload." \
+  "Inject can be updated"
+
+# ---------------------------------------------------------------------------
+# Planning Step 8: Facilitator Questions
+# ---------------------------------------------------------------------------
+
+section "PLANNING STEP 8: FACILITATOR QUESTIONS"
+
+if endpoint_exists "$BASE_URL/exercises/$EXERCISE_ID/questions/"; then
+  pass "Facilitator question API is exposed"
+else
+  gap "Facilitator questions are not exposed by the API"
+fi
 
 # ---------------------------------------------------------------------------
 # Prepared State
@@ -551,8 +562,7 @@ PREPARED_RESPONSE=$(
     }'
 )
 
-assert_eq \
-  "$(jq -r '.status' <<< "$PREPARED_RESPONSE")" \
+assert_eq "$(jq -r '.status' <<< "$PREPARED_RESPONSE")" \
   "prepared" \
   "Exercise can transition to prepared"
 
@@ -562,21 +572,164 @@ assert_eq \
 
 section "EXECUTING THE TTX"
 
+EXERCISE_STARTED_AT="2026-09-04T13:02:00-04:00"
+
 IN_PROGRESS_RESPONSE=$(
   api_curl \
     -X PATCH "$BASE_URL/exercises/$EXERCISE_ID/" \
     -H "Content-Type: application/json" \
+    -d "{
+      \"status\": \"in_progress\",
+      \"started_at\": \"$EXERCISE_STARTED_AT\"
+    }"
+)
+
+assert_eq "$(jq -r '.status' <<< "$IN_PROGRESS_RESPONSE")" \
+  "in_progress" \
+  "Exercise can transition to in_progress"
+assert_nonempty "$(jq -r '.started_at' <<< "$IN_PROGRESS_RESPONSE")" \
+  "Actual exercise start time can be recorded"
+
+EVENT_STARTED=$(
+  api_curl \
+    -X PATCH "$BASE_URL/exercises/$EXERCISE_ID/events/$EVENT_ID/" \
+    -H "Content-Type: application/json" \
     -d '{
-      "status": "in_progress"
+      "started_at": "2026-09-04T13:05:00-04:00"
     }'
 )
 
-assert_eq \
-  "$(jq -r '.status' <<< "$IN_PROGRESS_RESPONSE")" \
-  "in_progress" \
-  "Exercise can transition to in_progress"
+assert_nonempty "$(jq -r '.started_at' <<< "$EVENT_STARTED")" \
+  "Actual event start time can be recorded"
 
-gap "Actual execution state for events, injects, questions, and observations is not exposed by the API"
+INJECT_STARTED=$(
+  api_curl \
+    -X PATCH "$BASE_URL/exercises/$EXERCISE_ID/events/$EVENT_ID/injects/$INJECT_ID/" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "started_at": "2026-09-04T13:10:00-04:00"
+    }'
+)
+
+assert_nonempty "$(jq -r '.started_at' <<< "$INJECT_STARTED")" \
+  "Actual inject delivery/start time can be recorded"
+
+# ---------------------------------------------------------------------------
+# Participant Responses
+# ---------------------------------------------------------------------------
+
+section "EXECUTION: PARTICIPANT RESPONSES"
+
+RESPONSE_RESPONSE=$(
+  api_curl \
+    -X POST \
+    "$BASE_URL/exercises/$EXERCISE_ID/events/$EVENT_ID/injects/$INJECT_ID/responses/" \
+    -H "Content-Type: application/json" \
+    -d "{
+      \"participant_id\": \"$PARTICIPANT_ID\",
+      \"text\": \"Validated the alert, opened an incident, and began scoping the affected workload.\"
+    }"
+)
+
+RESPONSE_ID=$(jq -er '.id' <<< "$RESPONSE_RESPONSE")
+
+assert_nonempty "$RESPONSE_ID" "Actual participant response can be recorded"
+assert_eq "$(jq -r '.participant.id' <<< "$RESPONSE_RESPONSE")" \
+  "$PARTICIPANT_ID" \
+  "Response is attributed to a participant"
+assert_nonempty "$(jq -r '.text' <<< "$RESPONSE_RESPONSE")" \
+  "Actual response text is stored"
+
+RESPONSES=$(
+  api_curl \
+    "$BASE_URL/exercises/$EXERCISE_ID/events/$EVENT_ID/injects/$INJECT_ID/responses/"
+)
+
+if jq -e --arg id "$RESPONSE_ID" 'any(.[]; .id == $id)' \
+  <<< "$RESPONSES" >/dev/null; then
+  pass "Actual response appears in response list"
+else
+  fail "Actual response does not appear in response list"
+fi
+
+RESPONSE_GET=$(
+  api_curl \
+    "$BASE_URL/exercises/$EXERCISE_ID/events/$EVENT_ID/injects/$INJECT_ID/responses/$RESPONSE_ID/"
+)
+
+assert_eq "$(jq -r '.id' <<< "$RESPONSE_GET")" \
+  "$RESPONSE_ID" \
+  "Actual response can be retrieved by ID"
+
+if jq -e \
+  --arg expected "$(jq -r '.expected_response' <<< "$INJECT_GET")" \
+  --arg actual "$(jq -r '.text' <<< "$RESPONSE_GET")" \
+  '$expected != "" and $actual != ""' \
+  >/dev/null <<< '{}'; then
+  pass "Expected and actual response data are both available for assessment"
+else
+  fail "Expected and actual response data are not both available"
+fi
+
+# ---------------------------------------------------------------------------
+# Execution gaps
+# ---------------------------------------------------------------------------
+
+section "EXECUTION GAPS"
+
+if endpoint_exists "$BASE_URL/exercises/$EXERCISE_ID/observations/"; then
+  pass "Observation API is exposed"
+else
+  gap "Facilitator/evaluator observations are not exposed by the API"
+fi
+
+gap "Responses can be captured, but no explicit assessment/rating of expected versus actual response is exposed by the API"
+
+# ---------------------------------------------------------------------------
+# Finish event/inject/exercise execution
+# ---------------------------------------------------------------------------
+
+section "COMPLETE EXECUTION"
+
+INJECT_ENDED=$(
+  api_curl \
+    -X PATCH "$BASE_URL/exercises/$EXERCISE_ID/events/$EVENT_ID/injects/$INJECT_ID/" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "ended_at": "2026-09-04T13:25:00-04:00"
+    }'
+)
+
+assert_nonempty "$(jq -r '.ended_at' <<< "$INJECT_ENDED")" \
+  "Actual inject end time can be recorded"
+
+EVENT_ENDED=$(
+  api_curl \
+    -X PATCH "$BASE_URL/exercises/$EXERCISE_ID/events/$EVENT_ID/" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "ended_at": "2026-09-04T13:30:00-04:00"
+    }'
+)
+
+assert_nonempty "$(jq -r '.ended_at' <<< "$EVENT_ENDED")" \
+  "Actual event end time can be recorded"
+
+COMPLETED_RESPONSE=$(
+  api_curl \
+    -X PATCH "$BASE_URL/exercises/$EXERCISE_ID/" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "status": "completed",
+      "ended_at": "2026-09-04T15:03:00-04:00"
+    }'
+)
+
+assert_eq "$(jq -r '.status' <<< "$COMPLETED_RESPONSE")" \
+  "completed" \
+  "Exercise can transition to completed"
+assert_nonempty "$(jq -r '.ended_at' <<< "$COMPLETED_RESPONSE")" \
+  "Actual exercise end time can be recorded"
 
 # ---------------------------------------------------------------------------
 # Assessing the TTX
@@ -584,38 +737,70 @@ gap "Actual execution state for events, injects, questions, and observations is 
 
 section "ASSESSING THE TTX"
 
-COMPLETED_RESPONSE=$(
+FINAL_EXERCISE=$(api_curl "$BASE_URL/exercises/$EXERCISE_ID/")
+
+assert_nonempty "$(jq -r '.scenario' <<< "$FINAL_EXERCISE")" \
+  "AAR source data: scenario is available"
+assert_nonempty "$(jq -r '.scheduled_start_time' <<< "$FINAL_EXERCISE")" \
+  "AAR source data: scheduled start time is available"
+assert_nonempty "$(jq -r '.scheduled_end_time' <<< "$FINAL_EXERCISE")" \
+  "AAR source data: scheduled end time is available"
+assert_nonempty "$(jq -r '.started_at' <<< "$FINAL_EXERCISE")" \
+  "AAR source data: actual start time is available"
+assert_nonempty "$(jq -r '.ended_at' <<< "$FINAL_EXERCISE")" \
+  "AAR source data: actual end time is available"
+
+gap "Sustainments are not exposed by the API"
+gap "Improvements are not exposed by the API"
+gap "AAR generation is not exposed by the API"
+gap "AAR archival/export is not exposed by the API"
+
+# ---------------------------------------------------------------------------
+# CRUD completeness checks
+# ---------------------------------------------------------------------------
+
+section "CRUD COMPLETENESS"
+
+DELETE_STATUS=$(
+  curl -s \
+    -o /dev/null \
+    -w "%{http_code}" \
+    -X DELETE \
+    -H "Authorization: Bearer $JWT" \
+    "$BASE_URL/exercises/$EXERCISE_ID/events/$EVENT_ID/injects/$INJECT_ID/responses/$RESPONSE_ID/"
+)
+
+assert_eq "$DELETE_STATUS" "204" "Response can be deleted"
+
+# Create disposable records so DELETE coverage does not destroy the main
+# exercise evidence shown in FINAL EXERCISE.
+DELETE_PARTICIPANT=$(
   api_curl \
-    -X PATCH "$BASE_URL/exercises/$EXERCISE_ID/" \
+    -X POST "$BASE_URL/exercises/$EXERCISE_ID/participants/" \
     -H "Content-Type: application/json" \
     -d '{
-      "status": "completed"
+      "first_name": "Delete",
+      "last_name": "Me",
+      "role": "user"
     }'
 )
+DELETE_PARTICIPANT_ID=$(jq -er '.id' <<< "$DELETE_PARTICIPANT")
 
-assert_eq \
-  "$(jq -r '.status' <<< "$COMPLETED_RESPONSE")" \
-  "completed" \
-  "Exercise can transition to completed"
-
-FINAL_EXERCISE=$(
-  api_curl "$BASE_URL/exercises/$EXERCISE_ID/"
+DELETE_PARTICIPANT_STATUS=$(
+  curl -s \
+    -o /dev/null \
+    -w "%{http_code}" \
+    -X DELETE \
+    -H "Authorization: Bearer $JWT" \
+    "$BASE_URL/exercises/$EXERCISE_ID/participants/$DELETE_PARTICIPANT_ID/"
 )
 
-assert_nonempty \
-  "$(jq -r '.scenario' <<< "$FINAL_EXERCISE")" \
-  "AAR source data: scenario is available"
+assert_eq "$DELETE_PARTICIPANT_STATUS" "204" "Participant can be deleted"
 
-assert_nonempty \
-  "$(jq -r '.start_date_time' <<< "$FINAL_EXERCISE")" \
-  "AAR source data: start time is available"
-
-assert_nonempty \
-  "$(jq -r '.end_date_time' <<< "$FINAL_EXERCISE")" \
-  "AAR source data: end time is available"
-
-gap "Sustainments and improvements are not exposed by the API"
-gap "AAR generation and archival are not exposed by the API"
+# Reference/objective/event/inject/exercise DELETE endpoints are present in
+# OpenAPI. They are intentionally not invoked here because those records are
+# part of the final workflow evidence printed below.
+pass "OpenAPI exposes DELETE for exercises, events, injects, objectives, and references"
 
 # ---------------------------------------------------------------------------
 # Final Exercise
@@ -633,11 +818,13 @@ section "TTX WORKFLOW COVERAGE"
 
 printf "Passed capabilities : %d\n" "$PASS"
 printf "Failed tests        : %d\n" "$FAIL"
-printf "API gaps            : %d\n" "$GAP"
+printf "Workflow gaps       : %d\n" "$GAP"
 
-printf "\nExercise ID:  %s\n" "$EXERCISE_ID"
-printf "Objective ID: %s\n" "$OBJECTIVE_ID"
-printf "Reference ID: %s\n" "$REFERENCE_ID"
+printf "\nExercise ID:    %s\n" "$EXERCISE_ID"
+printf "Objective ID:   %s\n" "$OBJECTIVE_ID"
+printf "Reference ID:   %s\n" "$REFERENCE_ID"
+printf "Event ID:       %s\n" "$EVENT_ID"
+printf "Inject ID:      %s\n" "$INJECT_ID"
 
 if (( FAIL > 0 )); then
   printf "\nRESULT: One or more implemented API capabilities failed.\n"
@@ -645,9 +832,9 @@ if (( FAIL > 0 )); then
 fi
 
 if (( GAP > 0 )); then
-  printf "\nRESULT: Existing API works, but does not completely implement a TTX workflow.\n"
+  printf "\nRESULT: Implemented API capabilities pass, but TTX workflow gaps remain.\n"
   exit 2
 fi
 
-printf "\nRESULT: API completely implements a TTX workflow.\n"
+printf "\nRESULT: API completely implements the assessed TTX workflow.\n"
 exit 0

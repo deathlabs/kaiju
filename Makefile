@@ -3,7 +3,7 @@
 # ---------------------------------------------------------
 
 # Set the default goal.
-.DEFAULT_GOAL := build
+.DEFAULT_GOAL := redeploy
 
 # Tell Docker to build images in parallel.
 COMPOSE_BAKE := true
@@ -11,16 +11,10 @@ COMPOSE_BAKE := true
 # Set the Docker Compose profile to "all" if an argument is not provided.
 DOCKER_COMPOSE_PROFILE ?= all
 
-# ---------------------------------------------------------
-# Run the linter and formatter.
-# ---------------------------------------------------------
-
-.PHONY: qa
-.SILENT: qa
-
-qa:
-	ruff check --fix --exclude migrations &&\
-	ruff format --exclude migrations
+# Security scan configuration.
+SEMGREP_CONFIG ?= auto
+SBOM_FILE ?= kaiju-backend-sbom.json
+GRYPE_FAILURE_THRESHOLD ?= low
 
 # ---------------------------------------------------------
 # Reset Django migrations.
@@ -42,13 +36,44 @@ migrations:
 	cd backend && SECRET_KEY=kaiju uv run python manage.py makemigrations
 
 # ---------------------------------------------------------
+# Run the linter and formatter.
+# ---------------------------------------------------------
+
+.PHONY: qa
+.SILENT: qa
+
+qa:
+	ruff check --fix --exclude migrations &&\
+	ruff format --exclude migrations
+
+# ---------------------------------------------------------
+# Generate an SBOM.
+# ---------------------------------------------------------
+
+.PHONY: sbom
+.SILENT: sbom
+
+sbom:
+	syft dir:backend -o cyclonedx-json=$(SBOM_FILE)
+
+# ---------------------------------------------------------
+# Scan the SBOM for vulnerabilities.
+# ---------------------------------------------------------
+
+.PHONY: sca
+.SILENT: sca
+
+sca: sbom
+	grype sbom:$(SBOM_FILE) --fail-on $(GRYPE_FAILURE_THRESHOLD)
+
+# ---------------------------------------------------------
 # Build the containers.
 # ---------------------------------------------------------
 
 .PHONY: build
 .SILENT: build
 
-build: qa migrations
+build: migrations qa sca
 	docker compose --profile $(DOCKER_COMPOSE_PROFILE) build
 
 # ---------------------------------------------------------
@@ -100,18 +125,8 @@ deploy: build
 .SILENT: remove
 
 remove:
-	-uds zarf package remove kaiju --confirm
-	@if uds zarf tools kubectl get package.uds.dev kaiju -n kaiju >/dev/null 2>&1; then \
-		echo "Waiting for UDS package cleanup..."; \
-		uds zarf tools kubectl wait \
-			--for=delete package.uds.dev/kaiju \
-			-n kaiju \
-			--timeout=120s; \
-	fi
-	uds zarf tools kubectl delete namespace kaiju \
-		--ignore-not-found \
-		--wait=true \
-		--timeout=120s
+	uds zarf package remove kaiju --confirm || true &&\
+	uds zarf tools kubectl delete namespace kaiju --ignore-not-found
 
 # ---------------------------------------------------------
 # Redeploy the Zarf package.

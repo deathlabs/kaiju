@@ -220,3 +220,4 @@ __marimo__/
 .env
 log.txt
 *.zst
+*sbom.json

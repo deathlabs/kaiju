@@ -52,34 +52,20 @@ class ParticipantUpdateSchema(Schema):
     role: Participant.Role | None = None
 
 
-class EventSchema(Schema):
-    """The fields of an Event."""
+class ResponseSchema(Schema):
+    """The fields of a Response."""
 
     id: UUID
     created_at: datetime
-    updated_at: datetime
-    number: int
-    description: str
-    expected_actions: str
-    objectives: list[ObjectiveSchema]
+    participant: ParticipantSchema
+    text: str
 
 
-class EventCreateSchema(Schema):
-    """The fields required to create an Event."""
+class ResponseCreateSchema(Schema):
+    """The fields required to create a Response."""
 
-    number: int
-    description: str
-    expected_actions: str
-    objective_ids: list[UUID]
-
-
-class EventUpdateSchema(Schema):
-    """The fields that can be updated on an Event."""
-
-    number: int | None = None
-    description: str | None = None
-    expected_actions: str | None = None
-    objective_ids: list[UUID] | None = None
+    participant_id: UUID
+    text: str
 
 
 class InjectSchema(Schema):
@@ -88,66 +74,74 @@ class InjectSchema(Schema):
     id: UUID
     created_at: datetime
     updated_at: datetime
-    number: str
     scheduled_start_time: datetime
+    started_at: datetime | None
+    ended_at: datetime | None
+    number: str
     delivery_method: Inject.DeliveryMethod
     sender: str
-    recipient: str
+    recipient: ParticipantSchema
     message: str
+    expected_response: str
+    responses: list[ResponseSchema]
 
 
 class InjectCreateSchema(Schema):
     """The fields required to create an Inject."""
 
+    recipient_id: UUID
     number: str
     scheduled_start_time: datetime
     delivery_method: Inject.DeliveryMethod
     sender: str
-    recipient: str
     message: str
+    expected_response: str = ""
 
 
 class InjectUpdateSchema(Schema):
     """The fields that can be updated on an Inject."""
 
+    recipient_id: UUID | None = None
     number: str | None = None
     scheduled_start_time: datetime | None = None
+    started_at: datetime | None = None
+    ended_at: datetime | None = None
     delivery_method: Inject.DeliveryMethod | None = None
     sender: str | None = None
-    recipient: str | None = None
     message: str | None = None
+    expected_response: str | None = None
 
 
-class QuestionSchema(Schema):
-    """The fields of a Question."""
+class EventSchema(Schema):
+    """The fields of an Event."""
 
     id: UUID
     created_at: datetime
     updated_at: datetime
+    started_at: datetime | None
+    ended_at: datetime | None
     number: int
-    text: str
-    expected_answer: str
-    actual_answer: str | None
+    description: str
     objectives: list[ObjectiveSchema]
+    injects: list[InjectSchema]
 
 
-class QuestionCreateSchema(Schema):
-    """The fields required to create a Question."""
+class EventCreateSchema(Schema):
+    """The fields required to create an Event."""
 
     number: int
-    text: str
-    expected_answer: str
+    description: str
     objective_ids: list[UUID]
 
 
-class QuestionUpdateSchema(Schema):
-    """The fields that can be updated on a Question."""
+class EventUpdateSchema(Schema):
+    """The fields that can be updated on an Event."""
 
     number: int | None = None
-    text: str | None = None
-    expected_answer: str | None = None
-    actual_answer: str | None = None
+    description: str | None = None
     objective_ids: list[UUID] | None = None
+    started_at: datetime | None = None
+    ended_at: datetime | None = None
 
 
 class ExerciseSchema(Schema):
@@ -155,26 +149,40 @@ class ExerciseSchema(Schema):
 
     id: UUID
     created_at: datetime
+    updated_at: datetime
+    scheduled_start_time: datetime
+    scheduled_end_time: datetime
+    started_at: datetime | None
+    ended_at: datetime | None
     participants: list[ParticipantSchema]
     references: list[ReferenceSchema]
     objectives: list[ObjectiveSchema]
+    events: list[EventSchema]
     type: Exercise.Type
-    start_date_time: datetime
-    end_date_time: datetime
     title: str
     scenario: str
-    red_team_coordinated_at: datetime | None
+    opfor_coordinated_at: datetime | None
     read_aheads_sent_at: datetime | None
     status: Exercise.Status
-    updated_at: datetime
+
+
+class ExerciseListSchema(Schema):
+    """The abbreviated fields of an Exercise."""
+
+    id: UUID
+    scheduled_start_time: datetime
+    scheduled_end_time: datetime
+    type: Exercise.Type
+    title: str
+    status: Exercise.Status
 
 
 class ExerciseCreateSchema(Schema):
     """The fields required to create an Exercise."""
 
     type: Exercise.Type
-    start_date_time: datetime
-    end_date_time: datetime
+    scheduled_start_time: datetime
+    scheduled_end_time: datetime
     title: str
     scenario: str
 
@@ -185,10 +193,12 @@ class ExerciseUpdateSchema(Schema):
     reference_ids: list[UUID] | None = None
     objective_ids: list[UUID] | None = None
     type: Exercise.Type | None = None
-    start_date_time: datetime | None = None
-    end_date_time: datetime | None = None
+    scheduled_start_time: datetime | None = None
+    scheduled_end_time: datetime | None = None
+    started_at: datetime | None = None
+    ended_at: datetime | None = None
     title: str | None = None
     scenario: str | None = None
-    red_team_coordinated_at: datetime | None = None
+    opfor_coordinated_at: datetime | None = None
     read_aheads_sent_at: datetime | None = None
     status: Exercise.Status | None = None
