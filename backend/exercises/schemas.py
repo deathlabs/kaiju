@@ -9,7 +9,7 @@ from pydantic import EmailStr
 from references.schemas import ReferenceSchema
 
 # Local imports.
-from exercises.models import Exercise, Inject, Participant
+from exercises.models import Exercise, Finding, Inject, Participant
 
 
 class BadRequestResponseSchema(Schema):
@@ -144,6 +144,37 @@ class EventUpdateSchema(Schema):
     ended_at: datetime | None = None
 
 
+class FindingSchema(Schema):
+    """The fields of a Finding."""
+
+    id: UUID
+    created_at: datetime
+    created_by_id: int
+    updated_at: datetime
+    type: Finding.Type
+    topic: str
+    observation: str
+    recommendation: str
+
+
+class FindingCreateSchema(Schema):
+    """The fields required to create a Finding."""
+
+    type: Finding.Type
+    topic: str
+    observation: str
+    recommendation: str
+
+
+class FindingUpdateSchema(Schema):
+    """The fields that can be updated on a Finding."""
+
+    type: Finding.Type | None = None
+    topic: str | None = None
+    observation: str | None = None
+    recommendation: str | None = None
+
+
 class ExerciseSchema(Schema):
     """The fields of an Exercise."""
 
@@ -164,6 +195,7 @@ class ExerciseSchema(Schema):
     opfor_coordinated_at: datetime | None
     read_aheads_sent_at: datetime | None
     status: Exercise.Status
+    findings: list[FindingSchema]
 
 
 class ExerciseListSchema(Schema):
@@ -202,3 +234,9 @@ class ExerciseUpdateSchema(Schema):
     opfor_coordinated_at: datetime | None = None
     read_aheads_sent_at: datetime | None = None
     status: Exercise.Status | None = None
+
+
+class AfterActionReportSchema(Schema):
+    """The fields of an After Action Report."""
+
+    exercise: ExerciseSchema

@@ -536,18 +536,6 @@ assert_eq "$(jq -r '.message' <<< "$INJECT_PATCH")" \
   "Inject can be updated"
 
 # ---------------------------------------------------------------------------
-# Planning Step 8: Facilitator Questions
-# ---------------------------------------------------------------------------
-
-section "PLANNING STEP 8: FACILITATOR QUESTIONS"
-
-if endpoint_exists "$BASE_URL/exercises/$EXERCISE_ID/questions/"; then
-  pass "Facilitator question API is exposed"
-else
-  gap "Facilitator questions are not exposed by the API"
-fi
-
-# ---------------------------------------------------------------------------
 # Prepared State
 # ---------------------------------------------------------------------------
 
@@ -672,20 +660,6 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Execution gaps
-# ---------------------------------------------------------------------------
-
-section "EXECUTION GAPS"
-
-if endpoint_exists "$BASE_URL/exercises/$EXERCISE_ID/observations/"; then
-  pass "Observation API is exposed"
-else
-  gap "Facilitator/evaluator observations are not exposed by the API"
-fi
-
-gap "Responses can be captured, but no explicit assessment/rating of expected versus actual response is exposed by the API"
-
-# ---------------------------------------------------------------------------
 # Finish event/inject/exercise execution
 # ---------------------------------------------------------------------------
 
@@ -737,6 +711,66 @@ assert_nonempty "$(jq -r '.ended_at' <<< "$COMPLETED_RESPONSE")" \
 
 section "ASSESSING THE TTX"
 
+FINDING_RESPONSE=$(
+  api_curl \
+    -X POST "$BASE_URL/exercises/$EXERCISE_ID/findings/" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "type": "improvement",
+      "topic": "Incident Response Plan",
+      "observation": "Participants were unable to identify or reference an approved incident response plan during the exercise.",
+      "recommendation": "Develop, approve, and exercise an incident response plan."
+    }'
+)
+
+FINDING_ID=$(jq -er '.id' <<< "$FINDING_RESPONSE")
+
+assert_nonempty "$FINDING_ID" "Finding can be created"
+assert_eq "$(jq -r '.type' <<< "$FINDING_RESPONSE")" \
+  "improvement" \
+  "Finding type is stored"
+assert_eq "$(jq -r '.topic' <<< "$FINDING_RESPONSE")" \
+  "Incident Response Plan" \
+  "Finding topic is stored"
+assert_nonempty "$(jq -r '.observation' <<< "$FINDING_RESPONSE")" \
+  "Finding observation is stored"
+assert_nonempty "$(jq -r '.recommendation' <<< "$FINDING_RESPONSE")" \
+  "Finding recommendation is stored"
+assert_nonempty "$(jq -r '.created_by_id' <<< "$FINDING_RESPONSE")" \
+  "Finding is attributed to the authenticated user"
+
+FINDINGS=$(
+  api_curl "$BASE_URL/exercises/$EXERCISE_ID/findings/"
+)
+
+if jq -e --arg id "$FINDING_ID" 'any(.[]; .id == $id)' \
+  <<< "$FINDINGS" >/dev/null; then
+  pass "Finding appears in exercise findings"
+else
+  fail "Finding does not appear in exercise findings"
+fi
+
+FINDING_GET=$(
+  api_curl "$BASE_URL/exercises/$EXERCISE_ID/findings/$FINDING_ID/"
+)
+
+assert_eq "$(jq -r '.id' <<< "$FINDING_GET")" \
+  "$FINDING_ID" \
+  "Finding can be retrieved by ID"
+
+FINDING_PATCH=$(
+  api_curl \
+    -X PATCH "$BASE_URL/exercises/$EXERCISE_ID/findings/$FINDING_ID/" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "recommendation": "Develop, approve, and exercise an incident response plan."
+    }'
+)
+
+assert_eq "$(jq -r '.recommendation' <<< "$FINDING_PATCH")" \
+  "Develop, approve, and exercise an incident response plan." \
+  "Finding can be updated"
+
 FINAL_EXERCISE=$(api_curl "$BASE_URL/exercises/$EXERCISE_ID/")
 
 assert_nonempty "$(jq -r '.scenario' <<< "$FINAL_EXERCISE")" \
@@ -750,10 +784,81 @@ assert_nonempty "$(jq -r '.started_at' <<< "$FINAL_EXERCISE")" \
 assert_nonempty "$(jq -r '.ended_at' <<< "$FINAL_EXERCISE")" \
   "AAR source data: actual end time is available"
 
-gap "Sustainments are not exposed by the API"
-gap "Improvements are not exposed by the API"
-gap "AAR generation is not exposed by the API"
-gap "AAR archival/export is not exposed by the API"
+if jq -e --arg id "$FINDING_ID" 'any(.findings[]; .id == $id)' \
+  <<< "$FINAL_EXERCISE" >/dev/null; then
+  pass "Finding is included in exercise detail"
+else
+  fail "Finding is not included in exercise detail"
+fi
+
+# ---------------------------------------------------------------------------
+# After Action Report
+# ---------------------------------------------------------------------------
+
+section "AFTER ACTION REPORT"
+
+AAR_RESPONSE=$(
+  api_curl "$BASE_URL/exercises/$EXERCISE_ID/after-action-report/"
+)
+
+assert_eq "$(jq -r '.exercise.id' <<< "$AAR_RESPONSE")" \
+  "$EXERCISE_ID" \
+  "AAR can be generated for the completed exercise"
+assert_eq "$(jq -r '.exercise.status' <<< "$AAR_RESPONSE")" \
+  "completed" \
+  "AAR contains the completed exercise state"
+assert_eq "$(jq -r '.exercise.title' <<< "$AAR_RESPONSE")" \
+  "Incident Response TTX" \
+  "AAR contains the exercise title"
+assert_nonempty "$(jq -r '.exercise.scenario' <<< "$AAR_RESPONSE")" \
+  "AAR contains the exercise scenario"
+assert_nonempty "$(jq -r '.exercise.started_at' <<< "$AAR_RESPONSE")" \
+  "AAR contains the actual exercise start time"
+assert_nonempty "$(jq -r '.exercise.ended_at' <<< "$AAR_RESPONSE")" \
+  "AAR contains the actual exercise end time"
+
+if jq -e --arg id "$REFERENCE_ID" \
+  'any(.exercise.references[]; .id == $id)' \
+  <<< "$AAR_RESPONSE" >/dev/null; then
+  pass "AAR contains exercise references"
+else
+  fail "AAR does not contain exercise references"
+fi
+
+if jq -e --arg id "$OBJECTIVE_ID" \
+  'any(.exercise.objectives[]; .id == $id)' \
+  <<< "$AAR_RESPONSE" >/dev/null; then
+  pass "AAR contains exercise objectives"
+else
+  fail "AAR does not contain exercise objectives"
+fi
+
+if jq -e --arg id "$FINDING_ID" \
+  'any(.exercise.findings[]; .id == $id)' \
+  <<< "$AAR_RESPONSE" >/dev/null; then
+  pass "AAR contains exercise findings"
+else
+  fail "AAR does not contain exercise findings"
+fi
+
+if jq -e --arg id "$RESPONSE_ID" \
+  '[.exercise.events[].injects[].responses[] | select(.id == $id)] | length > 0' \
+  <<< "$AAR_RESPONSE" >/dev/null; then
+  pass "AAR contains participant response evidence"
+else
+  fail "AAR does not contain participant response evidence"
+fi
+
+MISSING_AAR_STATUS=$(
+  curl -s \
+    -o /dev/null \
+    -w "%{http_code}" \
+    -H "Authorization: Bearer $JWT" \
+    "$BASE_URL/exercises/00000000-0000-0000-0000-000000000000/after-action-report/"
+)
+
+assert_eq "$MISSING_AAR_STATUS" "404" \
+  "AAR generation returns 404 for an unknown exercise"
 
 # ---------------------------------------------------------------------------
 # CRUD completeness checks
@@ -797,6 +902,30 @@ DELETE_PARTICIPANT_STATUS=$(
 
 assert_eq "$DELETE_PARTICIPANT_STATUS" "204" "Participant can be deleted"
 
+DELETE_FINDING=$(
+  api_curl \
+    -X POST "$BASE_URL/exercises/$EXERCISE_ID/findings/" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "type": "sustainment",
+      "topic": "Exercise Participation",
+      "observation": "Participants communicated clearly during the exercise.",
+      "recommendation": "Continue using the current communication approach."
+    }'
+)
+DELETE_FINDING_ID=$(jq -er '.id' <<< "$DELETE_FINDING")
+
+DELETE_FINDING_STATUS=$(
+  curl -s \
+    -o /dev/null \
+    -w "%{http_code}" \
+    -X DELETE \
+    -H "Authorization: Bearer $JWT" \
+    "$BASE_URL/exercises/$EXERCISE_ID/findings/$DELETE_FINDING_ID/"
+)
+
+assert_eq "$DELETE_FINDING_STATUS" "204" "Finding can be deleted"
+
 # Reference/objective/event/inject/exercise DELETE endpoints are present in
 # OpenAPI. They are intentionally not invoked here because those records are
 # part of the final workflow evidence printed below.
@@ -825,6 +954,7 @@ printf "Objective ID:   %s\n" "$OBJECTIVE_ID"
 printf "Reference ID:   %s\n" "$REFERENCE_ID"
 printf "Event ID:       %s\n" "$EVENT_ID"
 printf "Inject ID:      %s\n" "$INJECT_ID"
+printf "Finding ID:     %s\n" "$FINDING_ID"
 
 if (( FAIL > 0 )); then
   printf "\nRESULT: One or more implemented API capabilities failed.\n"

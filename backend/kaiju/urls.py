@@ -6,7 +6,6 @@ from django.urls import path
 from exercises.router import exercises_router
 from ninja import NinjaAPI
 from objectives.router import objectives_router
-from observations.router import observations_router
 from references.router import references_router
 
 from .health import api as health_api
@@ -16,7 +15,6 @@ api.add_router("/health/", health_api)
 api.add_router("/references/", references_router)
 api.add_router("/objectives/", objectives_router)
 api.add_router("/exercises/", exercises_router)
-api.add_router("/observations/", observations_router)
 
 urlpatterns = [
     path("admin/", admin.site.urls),

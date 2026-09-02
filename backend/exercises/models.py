@@ -180,3 +180,30 @@ class Response(models.Model):
         on_delete=models.CASCADE,
     )
     text = models.TextField()
+
+
+class Finding(models.Model):
+    class Type(models.TextChoices):
+        SUSTAINMENT = "sustainment"
+        IMPROVEMENT = "improvement"
+
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="findings_created",
+        on_delete=models.PROTECT,
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+    type = models.CharField(max_length=20, choices=Type.choices)
+    topic = models.CharField(max_length=50)
+    observation = models.TextField()
+    recommendation = models.TextField()
+    exercise = models.ForeignKey(
+        Exercise,
+        related_name="findings",
+        on_delete=models.CASCADE,
+    )
+
+    def __str__(self) -> str:
+        return self.topic

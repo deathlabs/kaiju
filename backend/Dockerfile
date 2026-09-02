@@ -8,7 +8,6 @@ COPY pyproject.toml pyproject.toml
 COPY uv.lock uv.lock
 COPY references/ references/
 COPY objectives/ objectives/
-COPY observations/ observations/
 COPY manage.py manage.py
 RUN apk add --no-cache \
         python3 \

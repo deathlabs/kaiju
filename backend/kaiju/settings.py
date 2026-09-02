@@ -41,7 +41,6 @@ INSTALLED_APPS = [
     "exercises",
     "references",
     "objectives",
-    "observations",
 ]
 
 MIDDLEWARE = [

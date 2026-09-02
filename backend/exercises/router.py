@@ -8,8 +8,16 @@ from objectives.models import Objective
 from references.models import Reference
 
 # Local imports.
-from exercises.models import Event, Exercise, Inject, Participant, Response
+from exercises.models import (
+    Event,
+    Exercise,
+    Finding,
+    Inject,
+    Participant,
+    Response,
+)
 from exercises.schemas import (
+    AfterActionReportSchema,
     BadRequestResponseSchema,
     EventCreateSchema,
     EventSchema,
@@ -18,6 +26,9 @@ from exercises.schemas import (
     ExerciseListSchema,
     ExerciseSchema,
     ExerciseUpdateSchema,
+    FindingCreateSchema,
+    FindingSchema,
+    FindingUpdateSchema,
     InjectCreateSchema,
     InjectSchema,
     InjectUpdateSchema,
@@ -674,3 +685,135 @@ def delete_response(
     response.delete()
 
     return Status(204, None)
+
+
+@exercises_router.post(
+    "/{exercise_id}/findings/",
+    response={
+        201: FindingSchema,
+        404: NotFoundResponseSchema,
+    },
+)
+def create_finding(request, exercise_id: UUID, payload: FindingCreateSchema):
+    """Create a finding."""
+    try:
+        exercise = Exercise.objects.get(id=exercise_id)
+    except Exercise.DoesNotExist:
+        return Status(404, {"message": "Exercise not found"})
+
+    finding = Finding.objects.create(
+        exercise=exercise,
+        created_by=request.user,
+        **payload.model_dump(),
+    )
+
+    return Status(201, finding)
+
+
+@exercises_router.get(
+    "/{exercise_id}/findings/",
+    response={
+        200: list[FindingSchema],
+        404: NotFoundResponseSchema,
+    },
+)
+def list_findings(request, exercise_id: UUID):
+    """Fetch all findings."""
+    try:
+        exercise = Exercise.objects.get(id=exercise_id)
+    except Exercise.DoesNotExist:
+        return Status(404, {"message": "Exercise not found"})
+
+    return Status(
+        200,
+        Finding.objects.filter(exercise=exercise).order_by("created_at"),
+    )
+
+
+@exercises_router.get(
+    "/{exercise_id}/findings/{finding_id}/",
+    response={
+        200: FindingSchema,
+        404: NotFoundResponseSchema,
+    },
+)
+def get_finding(request, exercise_id: UUID, finding_id: UUID):
+    """Fetch a finding."""
+    try:
+        finding = Finding.objects.get(
+            id=finding_id,
+            exercise_id=exercise_id,
+        )
+    except Finding.DoesNotExist:
+        return Status(404, {"message": "Finding not found"})
+
+    return Status(200, finding)
+
+
+@exercises_router.patch(
+    "/{exercise_id}/findings/{finding_id}/",
+    response={
+        200: FindingSchema,
+        404: NotFoundResponseSchema,
+    },
+)
+def update_finding(
+    request,
+    exercise_id: UUID,
+    finding_id: UUID,
+    payload: FindingUpdateSchema,
+):
+    """Update a finding."""
+    try:
+        finding = Finding.objects.get(
+            id=finding_id,
+            exercise_id=exercise_id,
+        )
+    except Finding.DoesNotExist:
+        return Status(404, {"message": "Finding not found"})
+
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(finding, field, value)
+
+    finding.save()
+
+    return Status(200, finding)
+
+
+@exercises_router.delete(
+    "/{exercise_id}/findings/{finding_id}/",
+    response={
+        204: None,
+        404: NotFoundResponseSchema,
+    },
+)
+def delete_finding(request, exercise_id: UUID, finding_id: UUID):
+    """Delete a finding."""
+    try:
+        finding = Finding.objects.get(
+            id=finding_id,
+            exercise_id=exercise_id,
+        )
+    except Finding.DoesNotExist:
+        return Status(404, {"message": "Finding not found"})
+
+    finding.delete()
+
+    return Status(204, None)
+
+
+@exercises_router.get(
+    "/{exercise_id}/after-action-report/",
+    response={
+        200: AfterActionReportSchema,
+        404: NotFoundResponseSchema,
+    },
+)
+def get_after_action_report(request, exercise_id: UUID):
+    """Generate an After Action Report."""
+    try:
+        exercise = Exercise.objects.get(id=exercise_id)
+    except Exercise.DoesNotExist:
+        return Status(404, {"message": "Exercise not found"})
+
+    return Status(200, {"exercise": exercise})
