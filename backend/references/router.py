@@ -14,10 +14,10 @@ from references.schemas import (
 )
 
 # Init the references router.
-router = Router(tags=["references"])
+references_router = Router(tags=["references"])
 
 
-@router.post(
+@references_router.post(
     "/",
     response={201: ReferenceSchema},
 )
@@ -27,13 +27,13 @@ def create_reference(request, payload: ReferenceCreateSchema):
     return Status(201, reference)
 
 
-@router.get("/", response={200: list[ReferenceSchema]})
+@references_router.get("/", response={200: list[ReferenceSchema]})
 def list_references(request):
     """Fetch all references."""
     return Status(200, Reference.objects.all())
 
 
-@router.get(
+@references_router.get(
     "/{reference_id}/",
     response={
         200: ReferenceSchema,
@@ -48,7 +48,7 @@ def get_reference(request, reference_id: UUID):
         return Status(404, {"message": "Reference not found"})
 
 
-@router.patch(
+@references_router.patch(
     "/{reference_id}/",
     response={
         200: ReferenceSchema,
@@ -69,7 +69,7 @@ def update_reference(request, reference_id: UUID, payload: ReferenceUpdateSchema
     return Status(200, reference)
 
 
-@router.delete(
+@references_router.delete(
     "/{reference_id}/",
     response={
         204: None,

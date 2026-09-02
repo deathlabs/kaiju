@@ -30,10 +30,10 @@ from exercises.schemas import (
 )
 
 # Init the exercises router.
-router = Router(tags=["exercises"])
+exercises_router = Router(tags=["exercises"])
 
 
-@router.post("/", response={201: ExerciseSchema})
+@exercises_router.post("/", response={201: ExerciseSchema})
 @transaction.atomic
 def create_exercise(request, payload: ExerciseCreateSchema):
     """Create an exercise."""
@@ -53,13 +53,13 @@ def create_exercise(request, payload: ExerciseCreateSchema):
     return Status(201, exercise)
 
 
-@router.get("/", response={200: list[ExerciseListSchema]})
+@exercises_router.get("/", response={200: list[ExerciseListSchema]})
 def list_exercises(request):
     """Fetch all exercises."""
     return Status(200, Exercise.objects.all())
 
 
-@router.get(
+@exercises_router.get(
     "/{exercise_id}/",
     response={
         200: ExerciseSchema,
@@ -74,7 +74,7 @@ def get_exercise(request, exercise_id: UUID):
         return Status(404, {"message": "Exercise not found"})
 
 
-@router.patch(
+@exercises_router.patch(
     "/{exercise_id}/",
     response={
         200: ExerciseSchema,
@@ -109,7 +109,7 @@ def update_exercise(request, exercise_id: UUID, payload: ExerciseUpdateSchema):
     return Status(200, exercise)
 
 
-@router.delete(
+@exercises_router.delete(
     "/{exercise_id}/",
     response={
         204: None,
@@ -128,7 +128,7 @@ def delete_exercise(request, exercise_id: UUID):
     return Status(204, None)
 
 
-@router.post(
+@exercises_router.post(
     "/{exercise_id}/participants/",
     response={
         201: ParticipantSchema,
@@ -150,7 +150,7 @@ def create_participant(request, exercise_id: UUID, payload: ParticipantCreateSch
     return Status(201, participant)
 
 
-@router.get(
+@exercises_router.get(
     "/{exercise_id}/participants/",
     response={
         200: list[ParticipantSchema],
@@ -170,7 +170,7 @@ def list_participants(request, exercise_id: UUID):
     )
 
 
-@router.get(
+@exercises_router.get(
     "/{exercise_id}/participants/{participant_id}/",
     response={
         200: ParticipantSchema,
@@ -190,7 +190,7 @@ def get_participant(request, exercise_id: UUID, participant_id: UUID):
     return Status(200, participant)
 
 
-@router.patch(
+@exercises_router.patch(
     "/{exercise_id}/participants/{participant_id}/",
     response={
         200: ParticipantSchema,
@@ -240,7 +240,7 @@ def update_participant(
     return Status(200, participant)
 
 
-@router.delete(
+@exercises_router.delete(
     "/{exercise_id}/participants/{participant_id}/",
     response={
         204: None,
@@ -275,7 +275,7 @@ def delete_participant(request, exercise_id: UUID, participant_id: UUID):
     return Status(204, None)
 
 
-@router.post(
+@exercises_router.post(
     "/{exercise_id}/events/",
     response={
         201: EventSchema,
@@ -304,7 +304,7 @@ def create_event(request, exercise_id: UUID, payload: EventCreateSchema):
     return Status(201, event)
 
 
-@router.get(
+@exercises_router.get(
     "/{exercise_id}/events/",
     response={
         200: list[EventSchema],
@@ -324,7 +324,7 @@ def list_events(request, exercise_id: UUID):
     )
 
 
-@router.get(
+@exercises_router.get(
     "/{exercise_id}/events/{event_id}/",
     response={
         200: EventSchema,
@@ -344,7 +344,7 @@ def get_event(request, exercise_id: UUID, event_id: UUID):
     return Status(200, event)
 
 
-@router.patch(
+@exercises_router.patch(
     "/{exercise_id}/events/{event_id}/",
     response={
         200: EventSchema,
@@ -383,7 +383,7 @@ def update_event(
     return Status(200, event)
 
 
-@router.delete(
+@exercises_router.delete(
     "/{exercise_id}/events/{event_id}/",
     response={
         204: None,
@@ -405,7 +405,7 @@ def delete_event(request, exercise_id: UUID, event_id: UUID):
     return Status(204, None)
 
 
-@router.post(
+@exercises_router.post(
     "/{exercise_id}/events/{event_id}/injects/",
     response={
         201: InjectSchema,
@@ -447,7 +447,7 @@ def create_inject(
     return Status(201, inject)
 
 
-@router.get(
+@exercises_router.get(
     "/{exercise_id}/events/{event_id}/injects/",
     response={
         200: list[InjectSchema],
@@ -470,7 +470,7 @@ def list_injects(request, exercise_id: UUID, event_id: UUID):
     )
 
 
-@router.get(
+@exercises_router.get(
     "/{exercise_id}/events/{event_id}/injects/{inject_id}/",
     response={
         200: InjectSchema,
@@ -491,7 +491,7 @@ def get_inject(request, exercise_id: UUID, event_id: UUID, inject_id: UUID):
     return Status(200, inject)
 
 
-@router.patch(
+@exercises_router.patch(
     "/{exercise_id}/events/{event_id}/injects/{inject_id}/",
     response={
         200: InjectSchema,
@@ -525,7 +525,7 @@ def update_inject(
     return Status(200, inject)
 
 
-@router.delete(
+@exercises_router.delete(
     "/{exercise_id}/events/{event_id}/injects/{inject_id}/",
     response={
         204: None,
@@ -548,7 +548,7 @@ def delete_inject(request, exercise_id: UUID, event_id: UUID, inject_id: UUID):
     return Status(204, None)
 
 
-@router.post(
+@exercises_router.post(
     "/{exercise_id}/events/{event_id}/injects/{inject_id}/responses/",
     response={
         201: ResponseSchema,
@@ -589,7 +589,7 @@ def create_response(
     return Status(201, response)
 
 
-@router.get(
+@exercises_router.get(
     "/{exercise_id}/events/{event_id}/injects/{inject_id}/responses/",
     response={
         200: list[ResponseSchema],
@@ -618,7 +618,7 @@ def list_responses(
     )
 
 
-@router.get(
+@exercises_router.get(
     "/{exercise_id}/events/{event_id}/injects/{inject_id}/responses/{response_id}/",
     response={
         200: ResponseSchema,
@@ -646,7 +646,7 @@ def get_response(
     return Status(200, response)
 
 
-@router.delete(
+@exercises_router.delete(
     "/{exercise_id}/events/{event_id}/injects/{inject_id}/responses/{response_id}/",
     response={
         204: None,

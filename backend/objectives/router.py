@@ -13,11 +13,11 @@ from objectives.schemas import (
     ObjectiveUpdateSchema,
 )
 
-# Init the references router.
-router = Router(tags=["objectives"])
+# Init the objectives router.
+objectives_router = Router(tags=["objectives"])
 
 
-@router.post(
+@objectives_router.post(
     "/",
     response={201: ObjectiveSchema},
 )
@@ -27,13 +27,13 @@ def create_objective(request, payload: ObjectiveCreateSchema):
     return Status(201, objective)
 
 
-@router.get("/", response={200: list[ObjectiveSchema]})
+@objectives_router.get("/", response={200: list[ObjectiveSchema]})
 def list_objectives(request):
     """Fetch all objectives."""
     return Status(200, Objective.objects.all())
 
 
-@router.get(
+@objectives_router.get(
     "/{objective_id}/",
     response={
         200: ObjectiveSchema,
@@ -48,7 +48,7 @@ def get_objective(request, objective_id: UUID):
         return Status(404, {"message": "Objective not found"})
 
 
-@router.patch(
+@objectives_router.patch(
     "/{objective_id}/",
     response={
         200: ObjectiveSchema,
@@ -69,7 +69,7 @@ def update_objective(request, objective_id: UUID, payload: ObjectiveUpdateSchema
     return Status(200, objective)
 
 
-@router.delete(
+@objectives_router.delete(
     "/{objective_id}/",
     response={
         204: None,
