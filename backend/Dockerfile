@@ -1,4 +1,5 @@
-FROM alpine:3.23
+ARG BASE_IMAGE=alpine:3.23
+FROM ${BASE_IMAGE}
 LABEL image.authors="Victor Fernandez III, @cyberphor"
 WORKDIR /home/backend/
 COPY entrypoint.sh entrypoint.sh
