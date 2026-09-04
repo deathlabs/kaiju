@@ -13,6 +13,7 @@ COPY manage.py manage.py
 RUN apk add --no-cache \
         python3 \
         uv && \
+    rm -f /usr/bin/wget &&\
     uv sync --frozen && \
     adduser -D kaiju -h /home/backend/ &&\
     chmod u+x /home/backend/entrypoint.sh &&\
