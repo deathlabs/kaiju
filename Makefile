@@ -40,7 +40,7 @@ lock:
 .PHONY: migrations
 .SILENT: migrations
 
-migrations: lock
+migrations: 
 	find backend \
 		-mindepth 3 -maxdepth 3 \
 		-path "*/migrations/*.py" \
@@ -83,13 +83,13 @@ sast:
 	semgrep scan --config $(SEMGREP_CONFIG) backend 
 
 # ---------------------------------------------------------
-# Build the containers.
+# Build the container images.
 # ---------------------------------------------------------
 
 .PHONY: build
 .SILENT: build
 
-build: migrations check format 
+build: lock migrations check format 
 	docker compose --profile $(DOCKER_COMPOSE_PROFILE) build
 
 # ---------------------------------------------------------
@@ -99,44 +99,47 @@ build: migrations check format
 .PHONY: vex
 .SILENT: vex
 
+define VEX_FILTER
+{
+  "@context": "https://openvex.dev/ns/v0.2.0",
+  "@id": "$(VEX_ID_BASE)-" + now,
+  "author": "$(VEX_AUTHOR)",
+  "timestamp": now,
+  "version": 1,
+  "statements": [
+    .advisories[] | {
+      "vulnerability": { "name": .vuln },
+      "products": [ .products[] | { "@id": . } ],
+      "status": .status,
+      "justification": .justification,
+      "impact_statement": .impact_statement
+    }
+  ]
+}
+endef
+export VEX_FILTER
+
 vex:
-	yq -o=json '\
-	  { \
-	    "@context": "https://openvex.dev/ns/v0.2.0", \
-	    "@id": ("$(VEX_ID_BASE)-" + (now | tostring)), \
-	    "author": "$(VEX_AUTHOR)", \
-	    "timestamp": (now | todate), \
-	    "version": 1, \
-	    "statements": [ \
-	      .advisories[] | { \
-	        "vulnerability": { "name": .vuln }, \
-	        "products": [ .products[] | { "@id": . } ], \
-	        "status": .status, \
-	        "justification": .justification, \
-	        "impact_statement": .notes \
-	      } \
-	    ] \
-	  } \
-	' $(BACKEND_ADVISORIES) > $(BACKEND_VEX)
+	yq -o=json "$$VEX_FILTER" $(BACKEND_ADVISORIES) > $(BACKEND_VEX)
 
 # ---------------------------------------------------------
-# Generate an SBOM.
+# Generate SBOMs for the container images.
 # ---------------------------------------------------------
 
 .PHONY: sbom
 .SILENT: sbom
 
-sbom: build
+sbom: 
 	syft $(BACKEND_IMAGE) -o cyclonedx-json=$(BACKEND_SBOM)
 
 # ---------------------------------------------------------
-# Scan the SBOM for vulnerabilities.
+# Scan each container image's dependencies for vulnerabilities.
 # ---------------------------------------------------------
 
 .PHONY: dependency-scan
 .SILENT: dependency-scan
 
-dependency-scan: sbom
+dependency-scan: 
 	grype db update &&\
 	if [ -f "$(BACKEND_VEX)" ]; then \
 		grype sbom:$(BACKEND_SBOM) --vex $(BACKEND_VEX) --fail-on $(GRYPE_FAILURE_THRESHOLD); \
@@ -151,7 +154,7 @@ dependency-scan: sbom
 .PHONY: start
 .SILENT: start
 
-start: build
+start: build sbom vex dependency-scan
 	docker compose --profile $(DOCKER_COMPOSE_PROFILE) up -d
 
 # ---------------------------------------------------------
@@ -181,7 +184,7 @@ status:
 .PHONY: deploy
 .SILENT: deploy
 
-deploy: build
+deploy: build sbom vex dependency-scan
 	uds zarf package create --confirm && \
 	uds zarf package deploy zarf-package-kaiju-amd64-0.1.0.tar.zst --confirm
 
