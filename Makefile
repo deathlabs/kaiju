@@ -63,7 +63,7 @@ check:
 	ruff check --fix --exclude migrations
 
 # ---------------------------------------------------------
-# Format the source for consistency.
+# Format the source code for consistency.
 # ---------------------------------------------------------
 
 .PHONY: format
@@ -71,6 +71,16 @@ check:
 
 format:
 	ruff format --exclude migrations
+
+# ---------------------------------------------------------
+# Check the source code for vulnerabilities.
+# ---------------------------------------------------------
+
+.PHONY: sast
+.SILENT: sast
+
+sast:
+	semgrep scan --config $(SEMGREP_CONFIG) backend 
 
 # ---------------------------------------------------------
 # Build the containers.

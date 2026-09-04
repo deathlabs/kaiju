@@ -1,5 +1,6 @@
 FROM alpine:3.24
 LABEL image.authors="Victor Fernandez III, @cyberphor"
+SHELL ["/bin/ash", "-o", "pipefail", "-c"]
 WORKDIR /home/backend/
 COPY entrypoint.sh entrypoint.sh
 COPY exercises/ exercises/
