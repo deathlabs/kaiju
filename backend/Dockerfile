@@ -1,5 +1,4 @@
-ARG BASE_IMAGE=alpine:3.23
-FROM ${BASE_IMAGE}
+FROM alpine:3.23
 LABEL image.authors="Victor Fernandez III, @cyberphor"
 WORKDIR /home/backend/
 COPY entrypoint.sh entrypoint.sh
@@ -13,8 +12,8 @@ COPY manage.py manage.py
 RUN apk add --no-cache \
         python3 \
         uv && \
-    rm -f /usr/bin/wget &&\
     uv sync --frozen && \
+    apk del wget && \
     adduser -D kaiju -h /home/backend/ &&\
     chmod u+x /home/backend/entrypoint.sh &&\
     chown -R kaiju:kaiju /home/backend/
