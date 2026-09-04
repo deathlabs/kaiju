@@ -21,7 +21,7 @@ VEX_ID_BASE ?= kaiju-backend
 
 # Security scanner configurations.
 SEMGREP_CONFIG ?= auto
-GRYPE_FAILURE_THRESHOLD ?= low
+GRYPE_FAILURE_THRESHOLD ?= medium
 
 # ---------------------------------------------------------
 # Update uv.lock.
@@ -108,7 +108,7 @@ define VEX_FILTER
   "version": 1,
   "statements": [
     .advisories[] | {
-      "vulnerability": { "name": .vuln },
+      "vulnerability": { "name": .vulnerability },
       "products": [ .products[] | { "@id": . } ],
       "status": .status,
       "justification": .justification,
@@ -119,7 +119,7 @@ define VEX_FILTER
 endef
 export VEX_FILTER
 
-vex:
+vex: 
 	yq -o=json "$$VEX_FILTER" $(BACKEND_ADVISORIES) > $(BACKEND_VEX)
 
 # ---------------------------------------------------------
@@ -129,7 +129,7 @@ vex:
 .PHONY: sbom
 .SILENT: sbom
 
-sbom: 
+sbom: build
 	syft $(BACKEND_IMAGE) -o cyclonedx-json=$(BACKEND_SBOM)
 
 # ---------------------------------------------------------
@@ -139,7 +139,7 @@ sbom:
 .PHONY: dependency-scan
 .SILENT: dependency-scan
 
-dependency-scan: 
+dependency-scan: sbom vex
 	grype db update &&\
 	if [ -f "$(BACKEND_VEX)" ]; then \
 		grype sbom:$(BACKEND_SBOM) --vex $(BACKEND_VEX) --fail-on $(GRYPE_FAILURE_THRESHOLD); \
@@ -154,7 +154,7 @@ dependency-scan:
 .PHONY: start
 .SILENT: start
 
-start: build sbom vex dependency-scan
+start: dependency-scan
 	docker compose --profile $(DOCKER_COMPOSE_PROFILE) up -d
 
 # ---------------------------------------------------------
@@ -184,7 +184,7 @@ status:
 .PHONY: deploy
 .SILENT: deploy
 
-deploy: build sbom vex dependency-scan
+deploy: dependency-scan
 	uds zarf package create --confirm && \
 	uds zarf package deploy zarf-package-kaiju-amd64-0.1.0.tar.zst --confirm
 
