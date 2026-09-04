@@ -11,10 +11,27 @@ COMPOSE_BAKE := true
 # Set the Docker Compose profile to "all" if an argument is not provided.
 DOCKER_COMPOSE_PROFILE ?= all
 
-# Security scan configuration.
+# Backend values.
+BACKEND_SBOM ?= kaiju-backend-sbom.json
+BACKEND_IMAGE ?= kaiju/backend:latest
+BACKEND_ADVISORIES ?= backend/vex.yaml
+BACKEND_VEX ?= backend/vex.json
+VEX_AUTHOR ?= Victor Fernandez III
+VEX_ID_BASE ?= kaiju-backend
+
+# Security scanner configurations.
 SEMGREP_CONFIG ?= auto
-SBOM_FILE ?= kaiju-backend-sbom.json
 GRYPE_FAILURE_THRESHOLD ?= low
+
+# ---------------------------------------------------------
+# Update uv.lock.
+# ---------------------------------------------------------
+
+.PHONY: lock
+.SILENT: lock
+
+lock:
+	cd backend && uv lock
 
 # ---------------------------------------------------------
 # Reset Django migrations.
@@ -23,7 +40,7 @@ GRYPE_FAILURE_THRESHOLD ?= low
 .PHONY: migrations
 .SILENT: migrations
 
-migrations:
+migrations: lock
 	find backend \
 		-mindepth 3 -maxdepth 3 \
 		-path "*/migrations/*.py" \
@@ -36,35 +53,24 @@ migrations:
 	cd backend && SECRET_KEY=kaiju uv run python manage.py makemigrations
 
 # ---------------------------------------------------------
-# Run the linter and formatter.
+# Check for bugs.
 # ---------------------------------------------------------
 
-.PHONY: qa
-.SILENT: qa
+.PHONY: check
+.SILENT: check
 
-qa:
-	ruff check --fix --exclude migrations &&\
+check:
+	ruff check --fix --exclude migrations
+
+# ---------------------------------------------------------
+# Format the source for consistency.
+# ---------------------------------------------------------
+
+.PHONY: format
+.SILENT: format
+
+format:
 	ruff format --exclude migrations
-
-# ---------------------------------------------------------
-# Generate an SBOM.
-# ---------------------------------------------------------
-
-.PHONY: sbom
-.SILENT: sbom
-
-sbom:
-	syft dir:backend -o cyclonedx-json=$(SBOM_FILE)
-
-# ---------------------------------------------------------
-# Scan the SBOM for vulnerabilities.
-# ---------------------------------------------------------
-
-.PHONY: sca
-.SILENT: sca
-
-sca: sbom
-	grype sbom:$(SBOM_FILE) --fail-on $(GRYPE_FAILURE_THRESHOLD)
 
 # ---------------------------------------------------------
 # Build the containers.
@@ -73,8 +79,60 @@ sca: sbom
 .PHONY: build
 .SILENT: build
 
-build: migrations qa sca
+build: migrations check format 
 	docker compose --profile $(DOCKER_COMPOSE_PROFILE) build
+
+# ---------------------------------------------------------
+# Generate VEX statements.
+# ---------------------------------------------------------
+
+.PHONY: vex
+.SILENT: vex
+
+vex:
+	yq -o=json '\
+	  { \
+	    "@context": "https://openvex.dev/ns/v0.2.0", \
+	    "@id": ("$(VEX_ID_BASE)-" + (now | tostring)), \
+	    "author": "$(VEX_AUTHOR)", \
+	    "timestamp": (now | todate), \
+	    "version": 1, \
+	    "statements": [ \
+	      .advisories[] | { \
+	        "vulnerability": { "name": .vuln }, \
+	        "products": [ .products[] | { "@id": . } ], \
+	        "status": .status, \
+	        "justification": .justification, \
+	        "impact_statement": .notes \
+	      } \
+	    ] \
+	  } \
+	' $(BACKEND_ADVISORIES) > $(BACKEND_VEX)
+
+# ---------------------------------------------------------
+# Generate an SBOM.
+# ---------------------------------------------------------
+
+.PHONY: sbom
+.SILENT: sbom
+
+sbom: build
+	syft $(BACKEND_IMAGE) -o cyclonedx-json=$(BACKEND_SBOM)
+
+# ---------------------------------------------------------
+# Scan the SBOM for vulnerabilities.
+# ---------------------------------------------------------
+
+.PHONY: dependency-scan
+.SILENT: dependency-scan
+
+dependency-scan: sbom
+	grype db update &&\
+	if [ -f "$(BACKEND_VEX)" ]; then \
+		grype sbom:$(BACKEND_SBOM) --vex $(BACKEND_VEX) --fail-on $(GRYPE_FAILURE_THRESHOLD); \
+	else \
+		grype sbom:$(BACKEND_SBOM) --fail-on $(GRYPE_FAILURE_THRESHOLD); \
+	fi
 
 # ---------------------------------------------------------
 # Start the containers.

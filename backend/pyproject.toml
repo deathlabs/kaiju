@@ -1,7 +1,7 @@
 [project]
 name = "kaiju"
 version = "0.1.0"
-requires-python = ">=3.12"
+requires-python = ">=3.14.7,<3.15"
 dependencies = [
     "django-ninja",
     "django-ninja-jwt>=5.4.5",

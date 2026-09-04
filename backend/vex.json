@@ -1,0 +1,28 @@
+{
+  "@context": "https://openvex.dev/ns/v0.2.0",
+  "@id": "https://kaiju.deathlabs.dev/vex/backend-2026-09-04T12:00:03Z",
+  "author": "Victor Fernandez III",
+  "timestamp": "2026-09-04T12:00:03Z",
+  "version": 1,
+  "statements": [
+    {
+      "vulnerability": {
+        "name": "CVE-2025-60876"
+      },
+      "products": [
+        {
+          "@id": "pkg:apk/alpine/busybox@1.37.0-r31"
+        },
+        {
+          "@id": "pkg:apk/alpine/busybox-binsh@1.37.0-r31"
+        },
+        {
+          "@id": "pkg:apk/alpine/ssl_client@1.37.0-r31"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The busybox wget applet is not invoked at runtime. Only uv, uvicorn, and Django are used. "
+    }
+  ]
+}
