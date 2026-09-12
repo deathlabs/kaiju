@@ -197,7 +197,8 @@ deploy: dependency-scan
 
 remove:
 	uds zarf package remove kaiju --confirm || true &&\
-	uds zarf tools kubectl delete namespace kaiju --ignore-not-found
+	uds zarf tools kubectl delete namespace kaiju --ignore-not-found 
+	# kubectl patch packages.uds.dev kaiju -n kaiju --type=merge -p '{"metadata":{"finalizers":[]}}'
 
 # ---------------------------------------------------------
 # Redeploy the Zarf package.
@@ -207,3 +208,13 @@ remove:
 .SILENT: redeploy
 
 redeploy: remove deploy
+
+# ---------------------------------------------------------
+# Update the UDS package.
+# ---------------------------------------------------------
+
+.PHONY: update-uds-package
+.SILENT: update-uds-package
+
+update-uds-package: 
+	uds zarf tools kubectl apply -f uds-package.yaml

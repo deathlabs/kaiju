@@ -38,14 +38,23 @@ spec:
         - https://kaiju.uds.dev/login
       enableAuthserviceSelector:
         app.kubernetes.io/component: backend
-    - name: Kaiju Bot
-      clientId: kaiju-bot
-      standardFlowEnabled: false
-      serviceAccountsEnabled: true
       protocolMappers:
         - name: audience
-          protocol: openid-connect
-          protocolMapper: oidc-audience-mapper
+          protocol: "openid-connect"
+          protocolMapper: "oidc-audience-mapper"
+          config:
+            included.client.audience: "kaiju"
+            access.token.claim: "true"
+    - name: Kaiju TUI
+      clientId: kaiju-tui
+      standardFlowEnabled: false
+      publicClient: true
+      attributes:
+        oauth2.device.authorization.grant.enabled: "true"
+      protocolMappers:
+        - name: audience
+          protocol: "openid-connect"
+          protocolMapper: "oidc-audience-mapper"
           config:
             included.client.audience: "kaiju"
             access.token.claim: "true"
@@ -53,3 +62,13 @@ spec:
             id.token.claim: "false"
             lightweight.claim: "false"
             userinfo.token.claim: "false"
+        - name: sub-override
+          protocol: "openid-connect"
+          protocolMapper: "oidc-usermodel-property-mapper"
+          config:
+            access.token.claim: "true"
+            id.token.claim: "false"
+            userinfo.token.claim: "false"
+            user.attribute: "id"
+            claim.name: "sub"
+            jsonType.label: "String"
