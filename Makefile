@@ -11,13 +11,16 @@ COMPOSE_BAKE := true
 # Set the Docker Compose profile to "all" if an argument is not provided.
 DOCKER_COMPOSE_PROFILE ?= all
 
+# Set app metadata.
+APP := kaiju
+
 # Backend values.
-BACKEND_SBOM ?= kaiju-backend-sbom.json
-BACKEND_IMAGE ?= kaiju/backend:latest
+BACKEND_SBOM ?= $(APP)-backend-sbom.json
+BACKEND_IMAGE ?= $(APP)/backend:latest
 BACKEND_ADVISORIES ?= backend/vex.yaml
 BACKEND_VEX ?= backend/vex.json
 VEX_AUTHOR ?= Victor Fernandez III
-VEX_ID_BASE ?= kaiju-backend
+VEX_ID_BASE ?= $(APP)-backend
 
 # Security scanner configurations.
 SEMGREP_CONFIG ?= auto
@@ -50,7 +53,7 @@ migrations:
 		-mindepth 3 -maxdepth 3 \
 		-path "*/migrations/__pycache__" \
 		-type d -exec rm -rf {} +
-	cd backend && SECRET_KEY=kaiju uv run python manage.py makemigrations
+	cd backend && SECRET_KEY=$(APP) uv run python manage.py makemigrations
 
 # ---------------------------------------------------------
 # Check for bugs.
@@ -100,11 +103,11 @@ build: lock migrations check format
 .SILENT: vex
 
 define VEX_FILTER
-{
+(now | todateiso8601) as $$timestamp | {
   "@context": "https://openvex.dev/ns/v0.2.0",
-  "@id": "$(VEX_ID_BASE)-" + now,
+  "@id": ("$(VEX_ID_BASE)-" + $$timestamp),
   "author": "$(VEX_AUTHOR)",
-  "timestamp": now,
+  "timestamp": $$timestamp,
   "version": 1,
   "statements": [
     .advisories[] | {
@@ -120,7 +123,7 @@ endef
 export VEX_FILTER
 
 vex: 
-	yq -o=json "$$VEX_FILTER" $(BACKEND_ADVISORIES) > $(BACKEND_VEX)
+	yq "$$VEX_FILTER" "$(BACKEND_ADVISORIES)" > "$(BACKEND_VEX)"
 
 # ---------------------------------------------------------
 # Generate SBOMs for the container images.
@@ -186,7 +189,7 @@ status:
 
 deploy: dependency-scan
 	uds zarf package create --confirm && \
-	uds zarf package deploy zarf-package-kaiju-amd64-0.1.0.tar.zst --confirm
+	uds zarf package deploy zarf-package-$(APP)-amd64-0.1.0.tar.zst --confirm
 
 # ---------------------------------------------------------
 # Remove the Zarf package.
@@ -196,9 +199,8 @@ deploy: dependency-scan
 .SILENT: remove
 
 remove:
-	uds zarf package remove kaiju --confirm || true &&\
-	uds zarf tools kubectl delete namespace kaiju --ignore-not-found 
-	# kubectl patch packages.uds.dev kaiju -n kaiju --type=merge -p '{"metadata":{"finalizers":[]}}'
+	uds zarf package remove $(APP) --confirm || true &&\
+	uds zarf tools kubectl delete namespace $(APP) --ignore-not-found 
 
 # ---------------------------------------------------------
 # Redeploy the Zarf package.
@@ -218,3 +220,13 @@ redeploy: remove deploy
 
 update-uds-package: 
 	uds zarf tools kubectl apply -f uds-package.yaml
+
+# ---------------------------------------------------------
+# Remove UDS finalizers.
+# ---------------------------------------------------------
+
+.PHONY: remove-finalizers
+.SILENT: remove-finalizers
+
+remove-finalizers:
+	kubectl patch packages.uds.dev $(APP) -n $(APP) --type=merge -p '{"metadata":{"finalizers":[]}}'

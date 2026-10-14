@@ -1,4 +1,4 @@
-# charts/backend/Chart.yaml
+# database/chart/Chart.yaml
 
 ---
 # Chart metadata.
@@ -7,5 +7,5 @@ type: application
 version: 0.1.0
 
 # Component metadata.
-name: backend
+name: database
 appVersion: 0.1.0

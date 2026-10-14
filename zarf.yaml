@@ -15,9 +15,9 @@ components:
       - name: database
         version: 0.1.0
         namespace: kaiju
-        localPath: charts/database
+        localPath: database/chart
         valuesFiles:
-          - charts/database/values.yaml
+          - database/chart/values.yaml
     images:
       - kaiju/database:latest
   - name: backend
@@ -26,9 +26,9 @@ components:
       - name: backend
         version: 0.1.0
         namespace: kaiju
-        localPath: charts/backend
+        localPath: backend/chart
         valuesFiles:
-          - charts/backend/values.yaml
+          - backend/chart/values.yaml
     images:
       - kaiju/backend:latest
   - name: uds

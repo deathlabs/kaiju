@@ -1,4 +1,4 @@
-# charts/backend/templates/service.yaml
+# backend/chart/templates/service.yaml
 
 ---
 apiVersion: v1
@@ -7,10 +7,12 @@ metadata:
   namespace: {{ .Values.namespace }}
   name: {{ .Values.service.name }}
   labels:
+    app.kubernetes.io/app: {{ .Values.app }}
     app.kubernetes.io/component: {{ .Values.service.name }}
 spec:
   type: {{ .Values.service.type }}
   selector:
+    app.kubernetes.io/app: {{ .Values.app }}
     app.kubernetes.io/component: {{ .Values.service.name }}
   ports:
     - port: {{ .Values.service.port }}

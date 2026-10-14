@@ -1,6 +1,7 @@
-# charts/backend/values.yaml
+# backend/chart/values.yaml
 
 ---
+app: kaiju
 namespace: kaiju
 replicaCount: 1
 image: 

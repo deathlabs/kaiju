@@ -1,5 +1,4 @@
-ARG BASE_IMAGE=alpine:3.23
-FROM ${BASE_IMAGE}
+FROM alpine:3.24
 LABEL image.authors="Victor Fernandez III, @cyberphor"
 WORKDIR /home/database/
 COPY entrypoint.sh entrypoint.sh

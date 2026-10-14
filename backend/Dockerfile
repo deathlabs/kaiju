@@ -12,7 +12,7 @@ COPY objectives/ objectives/
 COPY manage.py manage.py
 ENV UV_PYTHON_INSTALL_DIR=/home/backend/.uv-python
 RUN apk add --no-cache python3 uv && \
-    apk upgrade --no-cache libcrypto3 libssl3 &&\
+    apk upgrade --no-cache libcrypto3 libssl3 zlib &&\
     uv sync --frozen --python /usr/bin/python3 && \
     uv run python -m pip uninstall pip -y || true &&\
     (apk del wget || true) &&\

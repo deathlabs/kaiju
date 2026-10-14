@@ -5,7 +5,7 @@ advisories:
     justification: vulnerable_code_not_in_execute_path
     impact_statement: The poplib module is included in the Python standard library, but Kaiju does not use it or process POP3 protocol operations.
     products:
-      - pkg:apk/alpine/python3@3.14.7-r1
+      - pkg:apk/alpine/python3@3.14.8-r0
   - vulnerability: CVE-2025-60876
     status: not_affected
     justification: vulnerable_code_not_in_execute_path
@@ -19,17 +19,22 @@ advisories:
     justification: vulnerable_code_not_in_execute_path
     impact_statement: The urllib.request.HTTPPasswordMgr class is included in the Python standard library, but Kaiju does not use it.
     products:
-      - pkg:apk/alpine/python3@3.14.7-r1
+      - pkg:apk/alpine/python3@3.14.8-r0
   - vulnerability: CVE-2026-17084
     status: not_affected
     justification: vulnerable_code_not_in_execute_path
-    impact_statement: The stringprep and encodings.idna modules are included in the Python standard library, but Kaiju does not use them. 
+    impact_statement: The stringprep and encodings.idna modules are included in the Python standard library, but Kaiju does not use them.
     products:
-      - pkg:apk/alpine/python3@3.14.7-r1
+      - pkg:apk/alpine/python3@3.14.8-r0
   - vulnerability: CVE-2026-19672
     status: not_affected
     justification: vulnerable_code_not_in_execute_path
     impact_statement: The tarfile module is included in the Python standard library and imported by django.utils.archive, but Kaiju does not use it or perform any kind of archive extraction.
     products:
-      - pkg:apk/alpine/python3@3.14.7-r1
-  
+      - pkg:apk/alpine/python3@3.14.8-r0
+  - vulnerability: CVE-2026-12345
+    status: not_affected
+    justification: vulnerable_code_not_in_execute_path
+    impact_statement: Django references tempfile.TemporaryDirectory only in its symlink capability helper, which Kaiju does not call at runtime. Kaiju does not clean attacker-controlled directory trees.
+    products:
+      - pkg:apk/alpine/python3@3.14.8-r0

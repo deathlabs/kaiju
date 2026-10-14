@@ -8,29 +8,26 @@ metadata:
   name: kaiju
 spec:
   network:
+    allow:
+      # Allow all the pods in the app to talk to each other.
+      - description: Inbound internally
+        remoteGenerated: IntraNamespace
+        direction: Ingress
+        selector:
+          app.kubernetes.io/app: kaiju
+      - description: Outbound internally
+        remoteGenerated: IntraNamespace
+        direction: Egress
+        selector:
+          app.kubernetes.io/app: kaiju
+
+    # Allow user traffic to the backend.
     expose:
       - service: backend
         selector:
           app.kubernetes.io/component: backend
         host: kaiju
         port: 8000
-    allow:
-      - description: Backend to database
-        direction: Egress
-        selector:
-          app.kubernetes.io/component: backend
-        remoteNamespace: kaiju
-        remoteSelector:
-          app.kubernetes.io/component: database
-        port: 5432
-      - description: Database from backend
-        direction: Ingress
-        selector:
-          app.kubernetes.io/component: database
-        remoteNamespace: kaiju
-        remoteSelector:
-          app.kubernetes.io/component: backend
-        port: 5432
   sso:
     - name: Kaiju
       clientId: kaiju
