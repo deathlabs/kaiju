@@ -5,6 +5,11 @@ requires-python = ">=3.14.7,<3.15"
 dependencies = [
     "django-ninja",
     "django-ninja-jwt>=5.4.5",
+    "dnspython>=2.9.0",
+    "opentelemetry-distro",
+    "opentelemetry-exporter-otlp-proto-grpc",
+    "opentelemetry-instrumentation-django",
+    "opentelemetry-instrumentation-psycopg2",
     "psycopg2-binary",
     "pydantic[email]>=2.13.4",
     "tzdata",
