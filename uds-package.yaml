@@ -20,6 +20,15 @@ spec:
         direction: Egress
         selector:
           app.kubernetes.io/app: kaiju
+      - description: Backend traces to Jaeger
+        direction: Egress
+        selector:
+          app.kubernetes.io/component: backend
+        remoteNamespace: jaeger
+        remoteSelector:
+          app.kubernetes.io/name: jaeger
+        port: 4317
+        remoteProtocol: TCP
 
     # Allow user traffic to the backend.
     expose:

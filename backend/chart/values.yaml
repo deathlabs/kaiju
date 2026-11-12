@@ -12,6 +12,10 @@ service:
   type: ClusterIP
   name: backend
   port: 8000
+telemetry:
+  endpoint: http://jaeger.jaeger.svc.cluster.local:4317
+  protocol: grpc
+  serviceName: kaiju
 database:
   engine: postgres
   host: database
