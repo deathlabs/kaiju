@@ -215,6 +215,8 @@ __marimo__/
 .env.secrets
 
 .venv
+docs/kaiju/.cache/
+docs/kaiju/public/
 *.cer
 *.key
 .env

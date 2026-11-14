@@ -1,5 +1,13 @@
 services:
 
+  frontend:
+    profiles: [ all, frontend ]
+    build: frontend
+    image: kaiju/frontend:latest
+    container_name: kaiju-frontend
+    ports:
+      - "5173:5173"
+
   backend:
     profiles: [ all, backend ]
     build: backend
@@ -30,8 +38,10 @@ services:
       - kaiju_database:/var/lib/postgresql/data
     env_file:
       - database/.env
+    environment:
+      PGUSER: postgres
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U $${PGUSER} -d $${PGDATABASE}"]
       interval: 10s
       timeout: 5s
       retries: 2

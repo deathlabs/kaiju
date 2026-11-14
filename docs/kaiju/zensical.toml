@@ -1,0 +1,46 @@
+[project]
+site_name = "Kaiju"
+site_url = "https://deathlabs.github.io/kaiju/"
+repo_url = "https://github.com/deathlabs/kaiju"
+docs_dir = "content"
+site_dir = "public"
+use_directory_urls = true
+nav = [
+  { Home = "index.md" },
+  { "User Guide" = [
+    "user-guide/index.md",
+    { Exercises = "user-guide/exercises.md" },
+  ] },
+  { "Developer Guide" = [
+    "developer-guide/index.md",
+    { "Local Setup" = "developer-guide/local-setup.md" },
+    { Documentation = "developer-guide/documentation.md" },
+  ] },
+]
+
+[project.theme]
+variant = "modern"
+features = ["navigation.indexes"]
+
+# Follow the operating-system preference by default.
+[[project.theme.palette]]
+media = "(prefers-color-scheme)"
+toggle.icon = "lucide/sun-moon"
+toggle.name = "Switch to light mode"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: light)"
+scheme = "default"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to dark mode"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: dark)"
+scheme = "slate"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to system preference"
+
+[project.markdown_extensions]
+pymdownx.superfences.custom_fences = [
+  { name = "mermaid", class = "mermaid", format = "pymdownx.superfences.fence_code_format" },
+]

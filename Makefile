@@ -2,6 +2,9 @@
 # Misc.
 # ---------------------------------------------------------
 
+# Use Bash as the default shell.
+SHELL := /bin/bash
+
 # Set the default goal.
 .DEFAULT_GOAL := redeploy
 
@@ -13,6 +16,10 @@ DOCKER_COMPOSE_PROFILE ?= all
 
 # Set app metadata.
 APP := kaiju
+
+# Set local development paths.
+BACKEND_BUILD_CONTEXT := backend
+FRONTEND_BUILD_CONTEXT := frontend
 
 # Backend values.
 BACKEND_SBOM ?= $(APP)-backend-sbom.json
@@ -27,6 +34,41 @@ SEMGREP_CONFIG ?= auto
 GRYPE_FAILURE_THRESHOLD ?= medium
 
 # ---------------------------------------------------------
+# Run Zensical to serve documentation locally.
+# ---------------------------------------------------------
+
+.PHONY: docs
+.SILENT: docs
+
+docs:
+	cd docs/kaiju && uv run --locked zensical serve --config-file zensical.toml --dev-addr 0.0.0.0:8001
+
+# ---------------------------------------------------------
+# Run the local development stack.
+# ---------------------------------------------------------
+
+.PHONY: dev
+.SILENT: dev
+
+dev:
+	echo "[*] Starting $(APP)'s database"
+	docker compose --profile database up -d --wait
+
+	echo "[*] Applying $(APP)'s database migrations"
+	cd "$(BACKEND_BUILD_CONTEXT)" && \
+	source .env.example && \
+	export PGHOST=localhost && \
+	unset VIRTUAL_ENV && \
+	cd kaiju && \
+	uv run python manage.py migrate
+
+	echo "[*] Starting $(APP)'s backend and frontend"
+	APP="$(APP)" \
+	BACKEND_BUILD_CONTEXT="$(BACKEND_BUILD_CONTEXT)" \
+	FRONTEND_BUILD_CONTEXT="$(FRONTEND_BUILD_CONTEXT)" \
+		scripts/dev.sh
+
+# ---------------------------------------------------------
 # Update uv.lock.
 # ---------------------------------------------------------
 
@@ -34,7 +76,7 @@ GRYPE_FAILURE_THRESHOLD ?= medium
 .SILENT: lock
 
 lock:
-	cd backend && uv lock
+	cd backend/kaiju && uv lock
 
 # ---------------------------------------------------------
 # Reset Django migrations.
@@ -44,16 +86,16 @@ lock:
 .SILENT: migrations
 
 migrations: 
-	find backend \
+	find backend/kaiju \
 		-mindepth 3 -maxdepth 3 \
 		-path "*/migrations/*.py" \
 		! -name "__init__.py" \
 		-type f -delete
-	find backend \
+	find backend/kaiju \
 		-mindepth 3 -maxdepth 3 \
 		-path "*/migrations/__pycache__" \
 		-type d -exec rm -rf {} +
-	cd backend && SECRET_KEY=$(APP) uv run python manage.py makemigrations
+	cd backend/kaiju && SECRET_KEY=$(APP) uv run python manage.py makemigrations
 
 # ---------------------------------------------------------
 # Check for bugs.
