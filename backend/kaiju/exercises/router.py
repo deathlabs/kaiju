@@ -4,8 +4,6 @@ from uuid import UUID
 # Third party imports.
 from django.db import transaction
 from ninja import Router, Status
-from objectives.models import Objective
-from references.models import Reference
 
 # Local imports.
 from exercises.models import (
@@ -39,6 +37,8 @@ from exercises.schemas import (
     ResponseCreateSchema,
     ResponseSchema,
 )
+from objectives.models import Objective
+from references.models import Reference
 
 # Init the exercises router.
 exercises_router = Router(tags=["exercises"])
@@ -50,6 +50,7 @@ def create_exercise(request, payload: ExerciseCreateSchema):
     """Create an exercise."""
     exercise = Exercise.objects.create(
         created_by=request.user,
+        updated_by=request.user,
         **payload.model_dump(),
     )
 
@@ -67,7 +68,10 @@ def create_exercise(request, payload: ExerciseCreateSchema):
 @exercises_router.get("/", response={200: list[ExerciseListSchema]})
 def list_exercises(request):
     """Fetch all exercises."""
-    return Status(200, Exercise.objects.all())
+    return Status(
+        200,
+        Exercise.objects.select_related("created_by", "updated_by").all(),
+    )
 
 
 @exercises_router.get(
@@ -80,7 +84,12 @@ def list_exercises(request):
 def get_exercise(request, exercise_id: UUID):
     """Fetch an exercise."""
     try:
-        return Status(200, Exercise.objects.get(id=exercise_id))
+        return Status(
+            200,
+            Exercise.objects.select_related("created_by", "updated_by").get(
+                id=exercise_id,
+            ),
+        )
     except Exercise.DoesNotExist:
         return Status(404, {"message": "Exercise not found"})
 
@@ -107,6 +116,7 @@ def update_exercise(request, exercise_id: UUID, payload: ExerciseUpdateSchema):
     for field, value in data.items():
         setattr(exercise, field, value)
 
+    exercise.updated_by = request.user
     exercise.save()
 
     if objective_ids is not None:

@@ -37,6 +37,10 @@ class AuthenticationTests(TestCase):
         issuer: str = "https://kaiju.local/realms/development",
         audience: str = "kaiju",
         expires_at: datetime | None = None,
+        username: str = "Vic Fernandez III",
+        given_name: str = "Vic",
+        family_name: str = "Fernandez III",
+        email: str = "victor@deathlabs.io",
     ) -> str:
         now = datetime.now(UTC)
         return encode(
@@ -46,10 +50,10 @@ class AuthenticationTests(TestCase):
                 "sub": "00000000-0000-0000-0000-000000000001",
                 "iat": now,
                 "exp": expires_at or now + timedelta(minutes=10),
-                "preferred_username": "Vic Fernandez III",
-                "given_name": "Vic",
-                "family_name": "Fernandez III",
-                "email": "victor@deathlabs.io",
+                "preferred_username": username,
+                "given_name": given_name,
+                "family_name": family_name,
+                "email": email,
             },
             private_key or self.private_key,
             algorithm="RS256",
@@ -147,6 +151,50 @@ class AuthenticationTests(TestCase):
         self.assertEqual(response.status_code, 201)
         user = get_user_model().objects.get(username="Vic Fernandez III")
         self.assertEqual(user.exercises_created.count(), 1)
+        self.assertEqual(user.exercises_updated.count(), 1)
+        self.assertEqual(response.json()["created_by"]["username"], user.username)
+        self.assertEqual(response.json()["updated_by"]["username"], user.username)
+
+    def test_exercise_update_records_authenticated_user(self):
+        with self._settings():
+            create_response = self.client.post(
+                "/api/v1/exercises/",
+                data=json.dumps(
+                    {
+                        "title": "Incident response exercise",
+                        "type": "discussion",
+                        "scheduled_start_time": "2026-11-16T13:00:00Z",
+                        "scheduled_end_time": "2026-11-16T15:00:00Z",
+                        "scenario": "Unknown outbound traffic was observed.",
+                    }
+                ),
+                content_type="application/json",
+                **self._authorization(self._token()),
+            )
+            exercise_id = create_response.json()["id"]
+            update_response = self.client.patch(
+                f"/api/v1/exercises/{exercise_id}/",
+                data=json.dumps({"title": "Updated exercise"}),
+                content_type="application/json",
+                **self._authorization(
+                    self._token(
+                        username="Grace Hopper",
+                        given_name="Grace",
+                        family_name="Hopper",
+                        email="grace@example.com",
+                    )
+                ),
+            )
+
+        self.assertEqual(update_response.status_code, 200)
+        self.assertEqual(
+            update_response.json()["created_by"]["username"],
+            "Vic Fernandez III",
+        )
+        self.assertEqual(
+            update_response.json()["updated_by"]["username"],
+            "Grace Hopper",
+        )
 
     def test_health_endpoint_does_not_require_token(self):
         response = self.client.get("/api/v1/health/")

@@ -4,12 +4,12 @@ from uuid import UUID
 
 # Third party imports.
 from ninja import Schema
-from objectives.schemas import ObjectiveSchema
 from pydantic import EmailStr
-from references.schemas import ReferenceSchema
 
 # Local imports.
 from exercises.models import Exercise, Finding, Inject, Participant
+from objectives.schemas import ObjectiveSchema
+from references.schemas import ReferenceSchema
 
 
 class BadRequestResponseSchema(Schema):
@@ -22,6 +22,14 @@ class NotFoundResponseSchema(Schema):
     """The fields returned when a resource is not found."""
 
     message: str
+
+
+class ExerciseUserSchema(Schema):
+    """The user fields displayed for exercise changes."""
+
+    username: str
+    first_name: str
+    last_name: str
 
 
 class ParticipantSchema(Schema):
@@ -180,7 +188,9 @@ class ExerciseSchema(Schema):
 
     id: UUID
     created_at: datetime
+    created_by: ExerciseUserSchema
     updated_at: datetime
+    updated_by: ExerciseUserSchema
     scheduled_start_time: datetime
     scheduled_end_time: datetime
     started_at: datetime | None
@@ -202,6 +212,8 @@ class ExerciseListSchema(Schema):
     """The abbreviated fields of an Exercise."""
 
     id: UUID
+    created_by: ExerciseUserSchema
+    updated_by: ExerciseUserSchema
     scheduled_start_time: datetime
     scheduled_end_time: datetime
     type: Exercise.Type

@@ -31,6 +31,11 @@ class Exercise(models.Model):
         related_name="exercises_created",
         on_delete=models.PROTECT,
     )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="exercises_updated",
+        on_delete=models.PROTECT,
+    )
     references = models.ManyToManyField(
         "references.Reference",
         related_name="exercises",
