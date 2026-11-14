@@ -1,0 +1,3 @@
+* Use [the documentation in this repository](docs/) to understand how this app is intended to be used and developed.
+* Update [`CHANGELOG.md`](CHANGELOG.md) when making changes to any of the components (e.g., backend or frontend) within this repository. Do not add entries for changes made to files relating to the documentation, local development environment, continuous integration pipeline, or deployment code. If you don't know what release you are contributing to, ask the user instead of picking or inventing one. When you update software, identify its previous version and its new version in changelog entry.
+

@@ -18,10 +18,10 @@ telemetry:
   serviceName: kaiju
 database:
   engine: postgres
-  host: database
+  host: "###ZARF_VAR_PGHOST###"
   port: 5432
   sslmode: disable
   secret_key: kaiju
-  name: kaiju
-  user: kaiju
-  password: kaiju
+  name: "###ZARF_VAR_PGDATABASE###"
+  user: "###ZARF_VAR_PGUSER###"
+  password: "###ZARF_VAR_PGPASSWORD###"

@@ -1,0 +1,11 @@
+# uds-bundle.yaml 
+---
+kind: UDSBundle
+metadata:
+  name: kaiju
+  description: Create and conduct tabletop exercises without stomping on your sprint schedule.
+  version: 0.1.0
+packages:
+  - name: kaiju
+    path: .
+    ref: 0.1.0
