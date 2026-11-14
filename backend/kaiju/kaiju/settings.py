@@ -29,6 +29,15 @@ DEBUG = True
 
 ALLOWED_HOSTS = ["127.0.0.1", "localhost", "backend", "kaiju.uds.dev"]
 
+AUTH_MODE = getenv("AUTH_MODE", "oidc")
+OIDC_ISSUER = getenv("OIDC_ISSUER", "https://sso.uds.dev/realms/uds")
+OIDC_AUDIENCE = getenv("OIDC_AUDIENCE", "kaiju")
+OIDC_JWKS_URL = getenv(
+    "OIDC_JWKS_URL",
+    f"{OIDC_ISSUER}/protocol/openid-connect/certs",
+)
+OIDC_PUBLIC_KEY_PATH = getenv("OIDC_PUBLIC_KEY_PATH")
+
 
 # Application definition
 
@@ -52,7 +61,6 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "kaiju.middleware.UDSUserMiddleware",
 ]
 
 ROOT_URLCONF = "kaiju.urls"

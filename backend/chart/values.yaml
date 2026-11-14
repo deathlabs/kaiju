@@ -16,6 +16,11 @@ telemetry:
   endpoint: http://jaeger.jaeger.svc.cluster.local:4317
   protocol: grpc
   serviceName: kaiju
+auth:
+  mode: oidc
+  issuer: "###ZARF_VAR_OIDC_ISSUER###"
+  audience: "###ZARF_VAR_OIDC_AUDIENCE###"
+  jwksUrl: "###ZARF_VAR_OIDC_JWKS_URL###"
 database:
   engine: postgres
   host: "###ZARF_VAR_PGHOST###"

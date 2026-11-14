@@ -16,6 +16,16 @@ if [[ -z "${BACKEND_BUILD_CONTEXT:-}" ]]; then
 	exit 1
 fi
 
+if [[ -z "${AUTH_AUDIENCE:-}" ]]; then
+	echo "AUTH_AUDIENCE is required." >&2
+	exit 1
+fi
+
+if [[ -z "${AUTH_ISSUER:-}" ]]; then
+	echo "AUTH_ISSUER is required." >&2
+	exit 1
+fi
+
 if [[ -z "${FRONTEND_BUILD_CONTEXT:-}" ]]; then
 	echo "FRONTEND_BUILD_CONTEXT is required." >&2
 	exit 1
@@ -24,6 +34,12 @@ fi
 # Set the backend and frontend process identifiers.
 backend_pid=""
 frontend_pid=""
+
+# Create the signed local token and its public key.
+uv run --project "$BACKEND_BUILD_CONTEXT/$APP" \
+	python scripts/auth.py \
+		--issuer "$AUTH_ISSUER" \
+		--audience "$AUTH_AUDIENCE"
 
 # Stop the application processes.
 cleanup() {
@@ -49,6 +65,7 @@ trap 'exit 143' TERM
 (
 	cd "$BACKEND_BUILD_CONTEXT"
 	source .env.example
+	source "${PWD}/../.env"
 	export PGHOST=localhost
 	unset VIRTUAL_ENV
 	cd kaiju
@@ -61,6 +78,10 @@ backend_pid=$!
 
 # Start the frontend development server.
 (
+	source "${PWD}/.env"
+	if [[ "${DEV_AUTH_DISABLED:-0}" == "1" ]]; then
+		unset AUTH_TOKEN
+	fi
 	cd "$FRONTEND_BUILD_CONTEXT/$APP"
 	exec npm run dev
 ) &

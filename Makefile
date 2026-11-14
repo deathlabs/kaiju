@@ -24,6 +24,10 @@ UDS_BUNDLE := uds-bundle-$(APP)-$(ARCHITECTURE)-$(APP_VERSION).tar.zst
 # Set local development paths.
 BACKEND_BUILD_CONTEXT := backend
 FRONTEND_BUILD_CONTEXT := frontend
+FRONTEND_SOURCE_DIR := $(FRONTEND_BUILD_CONTEXT)/$(APP)
+DESIGN_FILE := ../DESIGN.md
+AUTH_ISSUER ?= https://kaiju.local/realms/development
+AUTH_AUDIENCE ?= kaiju
 
 # Backend values.
 BACKEND_SBOM ?= $(APP)-backend-sbom.json
@@ -54,6 +58,26 @@ docs:
 	cd docs/kaiju && uv run --locked zensical serve --config-file zensical.toml --dev-addr 0.0.0.0:8001
 
 # ---------------------------------------------------------
+# Check the frontend design document.
+# ---------------------------------------------------------
+
+.PHONY: design-lint
+.SILENT: design-lint
+
+design-lint:
+	cd "$(FRONTEND_SOURCE_DIR)" && npm exec -- design.md lint "$(DESIGN_FILE)"
+
+# ---------------------------------------------------------
+# Check the frontend design document and return JSON.
+# ---------------------------------------------------------
+
+.PHONY: design-lint-json
+.SILENT: design-lint-json
+
+design-lint-json:
+	cd "$(FRONTEND_SOURCE_DIR)" && npm exec -- design.md lint --format json "$(DESIGN_FILE)"
+
+# ---------------------------------------------------------
 # Run the local development stack.
 # ---------------------------------------------------------
 
@@ -74,6 +98,8 @@ dev:
 
 	echo "[*] Starting $(APP)'s backend and frontend"
 	APP="$(APP)" \
+	AUTH_AUDIENCE="$(AUTH_AUDIENCE)" \
+	AUTH_ISSUER="$(AUTH_ISSUER)" \
 	BACKEND_BUILD_CONTEXT="$(BACKEND_BUILD_CONTEXT)" \
 	FRONTEND_BUILD_CONTEXT="$(FRONTEND_BUILD_CONTEXT)" \
 		scripts/dev.sh

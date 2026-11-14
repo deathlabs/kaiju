@@ -6,6 +6,9 @@
 - Added Deathlabs-prefixed layout, navigation, classification, and theme components to frontend version 0.1.0. The frontend remains at version 0.1.0.
 - Added Exercises, Objectives, and References placeholder pages to frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 - Added reference create, list, edit, and delete functions to frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Added exercise list and guided exercise creation functions to frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Added a current-user display and logout action to frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Added validated OIDC bearer authentication and signed local development tokens to backend version 0.1.0. The backend remains at version 0.1.0 from version 0.1.0.
 
 ### Changed
 - Moved backend and frontend version 0.1.0 source code into component-specific `kaiju` directories. Both components remain at version 0.1.0.

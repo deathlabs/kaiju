@@ -41,6 +41,14 @@ The target starts PostgreSQL in Docker and applies the current database migratio
 
 Open the frontend at `http://localhost:5173`. Open the backend at `http://localhost:8000`.
 
+Local development generates a signed token for `Vic Fernandez III`. The frontend proxy adds the token to API requests.
+
+Set `DEV_AUTH_DISABLED=1` to test unauthenticated API requests.
+
+```bash
+DEV_AUTH_DISABLED=1 make dev
+```
+
 Press `Ctrl+C` to stop the backend and frontend. The database continues to run in Docker.
 
 When you no longer need the database, stop it.

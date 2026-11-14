@@ -4,13 +4,13 @@ version = "0.1.0"
 requires-python = ">=3.14.7,<3.15"
 dependencies = [
     "django-ninja",
-    "django-ninja-jwt>=5.4.5",
     "dnspython>=2.9.0",
     "opentelemetry-distro",
     "opentelemetry-exporter-otlp-proto-grpc",
     "opentelemetry-instrumentation-django",
     "opentelemetry-instrumentation-psycopg2",
     "psycopg2-binary",
+    "pyjwt[crypto]>=2.10.1",
     "pydantic[email]>=2.13.4",
     "tzdata",
     "uvicorn",

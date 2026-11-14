@@ -8,10 +8,13 @@ from ninja import NinjaAPI
 from objectives.router import objectives_router
 from references.router import references_router
 
+from .auth import OIDCBearerAuthentication
 from .health import api as health_api
+from .identity import identity_router
 
-api = NinjaAPI()
+api = NinjaAPI(auth=OIDCBearerAuthentication())
 api.add_router("/health/", health_api)
+api.add_router("/", identity_router)
 api.add_router("/references/", references_router)
 api.add_router("/objectives/", objectives_router)
 api.add_router("/exercises/", exercises_router)

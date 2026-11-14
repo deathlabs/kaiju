@@ -136,6 +136,7 @@ celerybeat.pid
 
 # Environments
 .env
+public-key.pem
 .env.local.secrets
 .envrc
 .venv
