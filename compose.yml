@@ -5,6 +5,9 @@ services:
     build: frontend
     image: kaiju/frontend:latest
     container_name: kaiju-frontend
+    environment:
+      BACKEND_URL: http://backend:8000
+      FRONTEND_PORT: 5173
     ports:
       - "5173:5173"
 

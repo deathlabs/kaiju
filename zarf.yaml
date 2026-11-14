@@ -1,12 +1,24 @@
-# zarf.yaml
+# Kaiju application package included in the UDS Bundle.
 
 ---
+apiVersion: zarf.dev/v1alpha1
 kind: ZarfPackageConfig
 metadata:
   name: kaiju
+  description: Kaiju application services and UDS Operator configuration
   version: 0.1.0
   annotations:
     dev.uds.title: Kaiju
+
+variables:
+  - name: FRONTEND_PORT
+    default: "5173"
+    sensitive: false
+    description: Frontend service port
+  - name: BACKEND_URL
+    default: http://backend:8000
+    sensitive: false
+    description: Backend URL used by the frontend reverse proxy
 
 components:
   - name: database
@@ -31,10 +43,21 @@ components:
           - backend/chart/values.yaml
     images:
       - kaiju/backend:latest
-  - name: uds
+  - name: frontend
+    required: true
+    charts:
+      - name: frontend
+        version: 0.1.0
+        namespace: kaiju
+        localPath: frontend/chart
+        valuesFiles:
+          - frontend/chart/values.yaml
+    images:
+      - kaiju/frontend:latest
+  - name: uds-configuration
     required: true
     manifests:
-      - name: kaiju
+      - name: uds-package
         namespace: kaiju
         files:
           - uds-package.yaml

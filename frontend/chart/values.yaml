@@ -1,0 +1,16 @@
+# frontend/chart/values.yaml
+
+---
+app: kaiju
+namespace: kaiju
+replicaCount: 1
+image:
+  pullPolicy: Always
+  repository: kaiju/frontend
+  tag: latest
+service:
+  type: ClusterIP
+  name: frontend
+  port: "###ZARF_VAR_FRONTEND_PORT###"
+backend:
+  url: "###ZARF_VAR_BACKEND_URL###"

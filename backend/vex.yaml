@@ -1,5 +1,11 @@
 ---
 advisories:
+  - vulnerability: CVE-2026-119170
+    status: not_affected
+    justification: vulnerable_code_not_in_execute_path
+    impact_statement: The backend does not configure OpenSSL to operate in FIPS mode. This vulnerability affects only Python 3.14.10 processes that use OpenSSL in FIPS mode.
+    products:
+      - pkg:apk/alpine/python3@3.14.10-r1
   - vulnerability: CVE-2025-15367
     status: not_affected
     justification: vulnerable_code_not_in_execute_path
@@ -27,61 +33,61 @@ advisories:
   - vulnerability: CVE-2026-119379
     status: not_affected
     justification: vulnerable_code_not_in_execute_path
-    impact_statement: The deployed backend uses PostgreSQL. It does not load SQLite or process attacker-controlled SQLite databases or SQL.
+    impact_statement: This service uses PostgreSQL. It does not load SQLite or process attacker-controlled SQLite databases or SQL.
     products:
       - pkg:apk/alpine/sqlite-libs@3.53.4-r0
   - vulnerability: CVE-2026-119374
     status: not_affected
     justification: vulnerable_code_not_in_execute_path
-    impact_statement: The deployed backend uses PostgreSQL. It does not load SQLite or process attacker-controlled SQLite databases or SQL.
+    impact_statement: This service uses PostgreSQL. It does not load SQLite or process attacker-controlled SQLite databases or SQL.
     products:
       - pkg:apk/alpine/sqlite-libs@3.53.4-r0
   - vulnerability: CVE-2026-119378
     status: not_affected
     justification: vulnerable_code_not_in_execute_path
-    impact_statement: The deployed backend uses PostgreSQL. It does not load SQLite or process attacker-controlled SQLite databases or SQL.
+    impact_statement: This service uses PostgreSQL. It does not load SQLite or process attacker-controlled SQLite databases or SQL.
     products:
       - pkg:apk/alpine/sqlite-libs@3.53.4-r0
   - vulnerability: CVE-2026-119373
     status: not_affected
     justification: vulnerable_code_not_in_execute_path
-    impact_statement: The deployed backend uses PostgreSQL. It does not load SQLite or process attacker-controlled SQLite databases or SQL.
+    impact_statement: This service uses PostgreSQL. It does not load SQLite or process attacker-controlled SQLite databases or SQL.
     products:
       - pkg:apk/alpine/sqlite-libs@3.53.4-r0
   - vulnerability: CVE-2026-119375
     status: not_affected
     justification: vulnerable_code_not_in_execute_path
-    impact_statement: The deployed backend uses PostgreSQL. It does not load SQLite or process attacker-controlled SQLite databases or SQL.
+    impact_statement: This service uses PostgreSQL. It does not load SQLite or process attacker-controlled SQLite databases or SQL.
     products:
       - pkg:apk/alpine/sqlite-libs@3.53.4-r0
   - vulnerability: CVE-2026-119371
     status: not_affected
     justification: vulnerable_code_not_in_execute_path
-    impact_statement: The deployed backend uses PostgreSQL. It does not load SQLite or process attacker-controlled SQLite databases or SQL.
+    impact_statement: This service uses PostgreSQL. It does not load SQLite or process attacker-controlled SQLite databases or SQL.
     products:
       - pkg:apk/alpine/sqlite-libs@3.53.4-r0
   - vulnerability: CVE-2026-119376
     status: not_affected
     justification: vulnerable_code_not_in_execute_path
-    impact_statement: The deployed backend uses PostgreSQL. It does not load SQLite or process attacker-controlled SQLite databases or SQL.
+    impact_statement: This service uses PostgreSQL. It does not load SQLite or process attacker-controlled SQLite databases or SQL.
     products:
       - pkg:apk/alpine/sqlite-libs@3.53.4-r0
   - vulnerability: CVE-2026-119591
     status: not_affected
     justification: vulnerable_code_not_in_execute_path
-    impact_statement: The deployed backend uses PostgreSQL. It does not load SQLite or process attacker-controlled SQLite databases or SQL.
+    impact_statement: This service uses PostgreSQL. It does not load SQLite or process attacker-controlled SQLite databases or SQL.
     products:
       - pkg:apk/alpine/sqlite-libs@3.53.4-r0
   - vulnerability: CVE-2026-119372
     status: not_affected
     justification: vulnerable_code_not_in_execute_path
-    impact_statement: The deployed backend uses PostgreSQL. It does not load SQLite or process attacker-controlled SQLite databases or SQL.
+    impact_statement: This service uses PostgreSQL. It does not load SQLite or process attacker-controlled SQLite databases or SQL.
     products:
       - pkg:apk/alpine/sqlite-libs@3.53.4-r0
   - vulnerability: CVE-2026-119377
     status: not_affected
     justification: vulnerable_code_not_in_execute_path
-    impact_statement: The deployed backend uses PostgreSQL. It does not load SQLite or process attacker-controlled SQLite databases or SQL.
+    impact_statement: This service uses PostgreSQL. It does not load SQLite or process attacker-controlled SQLite databases or SQL.
     products:
       - pkg:apk/alpine/sqlite-libs@3.53.4-r0
   - vulnerability: CVE-2025-60876

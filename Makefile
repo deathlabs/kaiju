@@ -5,8 +5,8 @@
 # Use Bash as the default shell.
 SHELL := /bin/bash
 
-# Set the default goal.
-.DEFAULT_GOAL := redeploy
+# Build the UDS Bundle by default.
+.DEFAULT_GOAL := bundle
 
 # Tell Docker to build images in parallel.
 COMPOSE_BAKE := true
@@ -16,6 +16,10 @@ DOCKER_COMPOSE_PROFILE ?= all
 
 # Set app metadata.
 APP := kaiju
+APP_VERSION ?= 0.1.0
+ARCHITECTURE ?= amd64
+ZARF_PACKAGE := zarf-package-$(APP)-$(ARCHITECTURE)-$(APP_VERSION).tar.zst
+UDS_BUNDLE := uds-bundle-$(APP)-$(ARCHITECTURE)-$(APP_VERSION).tar.zst
 
 # Set local development paths.
 BACKEND_BUILD_CONTEXT := backend
@@ -28,6 +32,10 @@ BACKEND_ADVISORIES ?= backend/vex.yaml
 BACKEND_VEX ?= backend/vex.json
 VEX_AUTHOR ?= Victor Fernandez III
 VEX_ID_BASE ?= $(APP)-backend
+
+# Frontend values.
+FRONTEND_SBOM ?= $(APP)-frontend-sbom.json
+FRONTEND_IMAGE ?= $(APP)/frontend:latest
 
 # Security scanner configurations.
 SEMGREP_CONFIG ?= auto
@@ -125,7 +133,9 @@ format:
 .SILENT: sast
 
 sast:
-	semgrep scan --config $(SEMGREP_CONFIG) backend 
+	semgrep scan --config "$(SEMGREP_CONFIG)" \
+		"$(BACKEND_BUILD_CONTEXT)" \
+		"$(FRONTEND_BUILD_CONTEXT)"
 
 # ---------------------------------------------------------
 # Build the container images.
@@ -164,8 +174,9 @@ define VEX_FILTER
 endef
 export VEX_FILTER
 
-vex: 
-	yq "$$VEX_FILTER" "$(BACKEND_ADVISORIES)" > "$(BACKEND_VEX)"
+vex:
+	uds zarf tools yq -o=json "." "$(BACKEND_ADVISORIES)" | \
+		jq "$$VEX_FILTER" > "$(BACKEND_VEX)"
 
 # ---------------------------------------------------------
 # Generate SBOMs for the container images.
@@ -175,7 +186,8 @@ vex:
 .SILENT: sbom
 
 sbom: build
-	syft $(BACKEND_IMAGE) -o cyclonedx-json=$(BACKEND_SBOM)
+	syft "$(BACKEND_IMAGE)" -o "cyclonedx-json=$(BACKEND_SBOM)"
+	syft "$(FRONTEND_IMAGE)" -o "cyclonedx-json=$(FRONTEND_SBOM)"
 
 # ---------------------------------------------------------
 # Scan each container image's dependencies for vulnerabilities.
@@ -185,12 +197,13 @@ sbom: build
 .SILENT: dependency-scan
 
 dependency-scan: sbom vex
-	grype db update &&\
+	grype db update && \
 	if [ -f "$(BACKEND_VEX)" ]; then \
-		grype sbom:$(BACKEND_SBOM) --vex $(BACKEND_VEX) --fail-on $(GRYPE_FAILURE_THRESHOLD); \
+		grype "sbom:$(BACKEND_SBOM)" --vex "$(BACKEND_VEX)" --fail-on "$(GRYPE_FAILURE_THRESHOLD)"; \
 	else \
-		grype sbom:$(BACKEND_SBOM) --fail-on $(GRYPE_FAILURE_THRESHOLD); \
-	fi
+		grype "sbom:$(BACKEND_SBOM)" --fail-on "$(GRYPE_FAILURE_THRESHOLD)"; \
+	fi && \
+	grype "sbom:$(FRONTEND_SBOM)" --fail-on "$(GRYPE_FAILURE_THRESHOLD)"
 
 # ---------------------------------------------------------
 # Start the containers.
@@ -223,18 +236,39 @@ status:
 	docker compose --profile $(DOCKER_COMPOSE_PROFILE) ps --format "table {{.Name}}\t{{.Ports}}\t{{.Status}}"
 
 # ---------------------------------------------------------
-# Deploy the Zarf package.
+# Create the Zarf package for the UDS Bundle.
+# ---------------------------------------------------------
+
+.PHONY: package
+.SILENT: package
+
+package: dependency-scan
+	uds zarf package create . --architecture "$(ARCHITECTURE)" --confirm
+	test -f "$(ZARF_PACKAGE)"
+
+# ---------------------------------------------------------
+# Create the UDS Bundle delivery artifact.
+# ---------------------------------------------------------
+
+.PHONY: bundle
+.SILENT: bundle
+
+bundle: package
+	uds create . --architecture "$(ARCHITECTURE)" --confirm
+	test -f "$(UDS_BUNDLE)"
+
+# ---------------------------------------------------------
+# Deploy the UDS Bundle.
 # ---------------------------------------------------------
 
 .PHONY: deploy
 .SILENT: deploy
 
-deploy: dependency-scan
-	uds zarf package create --confirm && \
-	uds zarf package deploy zarf-package-$(APP)-amd64-0.1.0.tar.zst --confirm
+deploy: bundle
+	uds deploy "$(UDS_BUNDLE)" --confirm
 
 # ---------------------------------------------------------
-# Remove the Zarf package.
+# Remove the application package deployed by the UDS Bundle.
 # ---------------------------------------------------------
 
 .PHONY: remove
@@ -245,23 +279,13 @@ remove:
 	uds zarf tools kubectl delete namespace $(APP) --ignore-not-found 
 
 # ---------------------------------------------------------
-# Redeploy the Zarf package.
+# Redeploy the UDS Bundle.
 # ---------------------------------------------------------
 
 .PHONY: redeploy
 .SILENT: redeploy
 
 redeploy: remove deploy
-
-# ---------------------------------------------------------
-# Update the UDS package.
-# ---------------------------------------------------------
-
-.PHONY: update-uds-package
-.SILENT: update-uds-package
-
-update-uds-package: 
-	uds zarf tools kubectl apply -f uds-package.yaml
 
 # ---------------------------------------------------------
 # Remove UDS finalizers.

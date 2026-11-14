@@ -1,4 +1,4 @@
-# uds-package.yaml
+# UDS Operator configuration delivered in the Kaiju Zarf package.
 
 ---
 apiVersion: uds.dev/v1alpha1
@@ -30,20 +30,21 @@ spec:
         port: 4317
         remoteProtocol: TCP
 
-    # Allow user traffic to the backend.
+    # Route user traffic to the frontend.
     expose:
-      - service: backend
+      - service: frontend
+        description: Kaiju
         selector:
-          app.kubernetes.io/component: backend
+          app.kubernetes.io/component: frontend
         host: kaiju
-        port: 8000
+        port: ###ZARF_VAR_FRONTEND_PORT###
   sso:
     - name: Kaiju
       clientId: kaiju
       redirectUris:
         - https://kaiju.uds.dev/login
       enableAuthserviceSelector:
-        app.kubernetes.io/component: backend
+        app.kubernetes.io/component: frontend
       protocolMappers:
         - name: audience
           protocol: "openid-connect"
