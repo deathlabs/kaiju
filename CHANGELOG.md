@@ -11,6 +11,7 @@
 - Added validated OIDC bearer authentication and signed local development tokens to backend version 0.1.0. The backend remains at version 0.1.0 from version 0.1.0.
 
 ### Changed
+- Updated frontend version 0.1.0 to use the `DESIGN.md` tokens and a theme switcher that resets to dark mode after reload. The frontend remains at version 0.1.0 from version 0.1.0.
 - Moved backend and frontend version 0.1.0 source code into component-specific `kaiju` directories. Both components remain at version 0.1.0.
 - Made the Django management script executable in backend version 0.1.0. The backend remains at version 0.1.0 from version 0.1.0.
 - Moved the frontend build files into its `kaiju` directory and added frontend VEX support. The frontend remains at version 0.1.0 from version 0.1.0.

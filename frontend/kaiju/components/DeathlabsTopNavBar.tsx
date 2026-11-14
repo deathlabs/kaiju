@@ -44,7 +44,7 @@ export const DeathlabsTopNavBar = forwardRef<
           color="inherit"
           onClick={toggleColorMode}
         >
-          {mode === 'dark' ? <DarkModeIcon /> : <LightModeIcon />}
+          {mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
         </IconButton>
         <DeathlabsUserMenu items={userMenu} />
       </Toolbar>
