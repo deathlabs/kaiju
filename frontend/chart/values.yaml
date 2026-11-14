@@ -4,6 +4,11 @@
 app: kaiju
 namespace: kaiju
 replicaCount: 1
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 100
+  runAsGroup: 101
+  fsGroup: 101
 image:
   pullPolicy: Always
   repository: kaiju/frontend
@@ -14,3 +19,8 @@ service:
   port: "###ZARF_VAR_FRONTEND_PORT###"
 backend:
   url: "###ZARF_VAR_BACKEND_URL###"
+volumes:
+  - name: logs
+    mountPath: /var/log/nginx
+  - name: tmp
+    mountPath: /var/lib/nginx/tmp

@@ -224,3 +224,4 @@ log.txt
 *.zst
 *sbom.json
 *vex.json
+uds-config.yaml

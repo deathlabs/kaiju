@@ -14,6 +14,6 @@ fi
 
 envsubst '${FRONTEND_PORT} ${BACKEND_URL} ${DNS_RESOLVER} ${API_AUTHORIZATION}' \
     < /etc/nginx/templates/default.conf.template \
-    > /etc/nginx/conf.d/default.conf
+    > /var/lib/nginx/conf.d/default.conf
 
 exec "$@"

@@ -27,8 +27,8 @@ Install the backend and frontend dependencies before you start Kaiju.
 
 ```bash
 cd backend/kaiju && uv sync --locked
-cd ../../frontend && npm ci
-cd ..
+cd ../../frontend/kaiju && npm ci
+cd ../..
 ```
 
 Start the local development stack.

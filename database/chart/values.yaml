@@ -13,9 +13,9 @@ service:
   name: database
   port: 5432
 database:
-  name: kaiju
-  user: kaiju
-  password: kaiju
+  name: "###ZARF_VAR_PGDATABASE###"
+  user: "###ZARF_VAR_PGUSER###"
+  password: "###ZARF_VAR_PGPASSWORD###"
 storage:
   path: /var/lib/postgresql
   size: 5Gi

@@ -31,11 +31,13 @@ BACKEND_IMAGE ?= $(APP)/backend:latest
 BACKEND_ADVISORIES ?= backend/vex.yaml
 BACKEND_VEX ?= backend/vex.json
 VEX_AUTHOR ?= Victor Fernandez III
-VEX_ID_BASE ?= $(APP)-backend
+VEX_ID_BASE ?= $(APP)
 
 # Frontend values.
 FRONTEND_SBOM ?= $(APP)-frontend-sbom.json
 FRONTEND_IMAGE ?= $(APP)/frontend:latest
+FRONTEND_ADVISORIES ?= frontend/vex.yaml
+FRONTEND_VEX ?= frontend/vex.json
 
 # Security scanner configurations.
 SEMGREP_CONFIG ?= auto
@@ -157,7 +159,7 @@ build: lock migrations check format
 define VEX_FILTER
 (now | todateiso8601) as $$timestamp | {
   "@context": "https://openvex.dev/ns/v0.2.0",
-  "@id": ("$(VEX_ID_BASE)-" + $$timestamp),
+  "@id": ($$id + "-" + $$timestamp),
   "author": "$(VEX_AUTHOR)",
   "timestamp": $$timestamp,
   "version": 1,
@@ -176,7 +178,9 @@ export VEX_FILTER
 
 vex:
 	uds zarf tools yq -o=json "." "$(BACKEND_ADVISORIES)" | \
-		jq "$$VEX_FILTER" > "$(BACKEND_VEX)"
+		jq --arg id "$(VEX_ID_BASE)-backend" "$$VEX_FILTER" > "$(BACKEND_VEX)"
+	uds zarf tools yq -o=json "." "$(FRONTEND_ADVISORIES)" | \
+		jq --arg id "$(VEX_ID_BASE)-frontend" "$$VEX_FILTER" > "$(FRONTEND_VEX)"
 
 # ---------------------------------------------------------
 # Generate SBOMs for the container images.
@@ -203,7 +207,11 @@ dependency-scan: sbom vex
 	else \
 		grype "sbom:$(BACKEND_SBOM)" --fail-on "$(GRYPE_FAILURE_THRESHOLD)"; \
 	fi && \
-	grype "sbom:$(FRONTEND_SBOM)" --fail-on "$(GRYPE_FAILURE_THRESHOLD)"
+	if [ -f "$(FRONTEND_VEX)" ]; then \
+		grype "sbom:$(FRONTEND_SBOM)" --vex "$(FRONTEND_VEX)" --fail-on "$(GRYPE_FAILURE_THRESHOLD)"; \
+	else \
+		grype "sbom:$(FRONTEND_SBOM)" --fail-on "$(GRYPE_FAILURE_THRESHOLD)"; \
+	fi
 
 # ---------------------------------------------------------
 # Start the containers.

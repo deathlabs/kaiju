@@ -21,6 +21,11 @@ spec:
         app.kubernetes.io/app: {{ .Values.app }}
         app.kubernetes.io/component: {{ .Values.service.name }}
     spec:
+      securityContext:
+        runAsNonRoot: {{ .Values.securityContext.runAsNonRoot }}
+        runAsUser: {{ .Values.securityContext.runAsUser }}
+        runAsGroup: {{ .Values.securityContext.runAsGroup }}
+        fsGroup: {{ .Values.securityContext.fsGroup }}
       containers:
         - name: {{ .Values.service.name }}
           image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
@@ -30,6 +35,11 @@ spec:
           envFrom:
             - secretRef:
                 name: {{ .Values.service.name }}
+          volumeMounts:
+            {{- range .Values.volumes }}
+            - name: {{ .name }}
+              mountPath: {{ .mountPath }}
+            {{- end }}
           readinessProbe:
             httpGet:
               path: /
@@ -46,3 +56,8 @@ spec:
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 2
+      volumes:
+        {{- range .Values.volumes }}
+        - name: {{ .name }}
+          emptyDir: {}
+        {{- end }}

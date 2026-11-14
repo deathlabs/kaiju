@@ -61,7 +61,7 @@ backend_pid=$!
 
 # Start the frontend development server.
 (
-	cd "$FRONTEND_BUILD_CONTEXT"
+	cd "$FRONTEND_BUILD_CONTEXT/$APP"
 	exec npm run dev
 ) &
 frontend_pid=$!

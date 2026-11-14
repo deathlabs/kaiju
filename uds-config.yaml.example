@@ -1,0 +1,10 @@
+---
+shared:
+  PGHOST: "database"
+  PGDATABASE: "kaiju"
+  PGUSER: "kaiju"
+  PGPASSWORD: "kaiju"
+  FRONTEND_PORT: "5173"
+  OIDC_ISSUER: "https://sso.uds.dev/realms/uds"
+  OIDC_AUDIENCE: "kaiju"
+  OIDC_JWKS_URL: "https://sso.uds.dev/realms/uds/protocol/openid-connect/certs"

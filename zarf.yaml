@@ -11,6 +11,21 @@ metadata:
     dev.uds.title: Kaiju
 
 variables:
+  - name: PGHOST
+    default: database
+    sensitive: false
+    description: Database host
+  - name: PGDATABASE
+    default: kaiju
+    sensitive: false
+    description: Database name
+  - name: PGUSER
+    default: kaiju
+    sensitive: false
+    description: Database user name
+  - name: PGPASSWORD
+    sensitive: true
+    description: Database user password
   - name: FRONTEND_PORT
     default: "5173"
     sensitive: false
