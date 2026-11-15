@@ -11,10 +11,14 @@
 - Added related exercise identification to the edit objective modal in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 - Added interactive typed reference cards with related exercise counts and modal-based create, edit, and delete functions to frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 - Added exercise search across titles, scenarios, authors, and related records, plus type, objective, and reference filters to frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Added objective and reference search across their primary fields and related records to frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 - Added a current-user display and logout action to frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 - Added validated OIDC bearer authentication and signed local development tokens to backend version 0.1.0. The backend remains at version 0.1.0 from version 0.1.0.
 
 ### Changed
+- Organized the page modules in a dedicated `pages` directory in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Moved exercise objectives and references after the scenario field and standardized the Discussion and Hands-On label in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Updated the edit objective modal with clickable related exercises and read-only exercise information in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 - Updated frontend version 0.1.0 to use the new dark theme palette, accent color, text-style cancel actions, consistent delete controls, streamlined exercise, objective, and reference pages, and borderless navigation with smooth labels and evenly padded icons. The frontend remains at version 0.1.0 from version 0.1.0.
 - Replaced the Dashboard page with a Metrics card in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 - Updated frontend version 0.1.0 to use the `DESIGN.md` tokens and a theme switcher that resets to dark mode after reload. The frontend remains at version 0.1.0 from version 0.1.0.

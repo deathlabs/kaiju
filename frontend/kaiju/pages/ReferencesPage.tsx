@@ -1,4 +1,5 @@
 import AddIcon from '@mui/icons-material/Add'
+import SearchIcon from '@mui/icons-material/Search'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
@@ -12,35 +13,44 @@ import DialogActions from '@mui/material/DialogActions'
 import DialogContent from '@mui/material/DialogContent'
 import DialogContentText from '@mui/material/DialogContentText'
 import DialogTitle from '@mui/material/DialogTitle'
+import FormControl from '@mui/material/FormControl'
 import Grid from '@mui/material/Grid'
+import InputAdornment from '@mui/material/InputAdornment'
+import InputLabel from '@mui/material/InputLabel'
+import MenuItem from '@mui/material/MenuItem'
 import Paper from '@mui/material/Paper'
+import Select from '@mui/material/Select'
 import Stack from '@mui/material/Stack'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 
-interface ObjectiveExercise {
-  id: string
-  title: string
-}
+type ReferenceType = 'policy' | 'standard' | 'procedure' | 'guideline'
 
-interface Objective {
+interface Reference {
   id: string
   exercise_count: number
-  exercises?: ObjectiveExercise[]
+  type: ReferenceType
   title: string
-  description: string
+  url: string
   created_at: string
   updated_at: string
 }
 
-interface ObjectiveForm {
+interface ReferenceForm {
+  type: ReferenceType | ''
   title: string
-  description: string
+  url: string
 }
 
-const objectivesUrl = '/api/v1/objectives/'
-const emptyForm: ObjectiveForm = { title: '', description: '' }
+const referencesUrl = '/api/v1/references/'
+const emptyForm: ReferenceForm = { type: '', title: '', url: '' }
+const typeLabels: Record<ReferenceType, string> = {
+  policy: 'Policy',
+  standard: 'Standard',
+  procedure: 'Procedure',
+  guideline: 'Guideline',
+}
 
 const getErrorMessage = async (response: Response) => {
   try {
@@ -55,37 +65,37 @@ const getErrorMessage = async (response: Response) => {
   return `The request failed with status ${response.status}.`
 }
 
-export function ObjectivesPage() {
-  const [objectives, setObjectives] = useState<Objective[]>([])
+export function ReferencesPage() {
+  const [references, setReferences] = useState<Reference[]>([])
+  const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const [pageError, setPageError] = useState<string | null>(null)
   const [formOpen, setFormOpen] = useState(false)
-  const [editingObjective, setEditingObjective] = useState<Objective | null>(
+  const [editingReference, setEditingReference] = useState<Reference | null>(
     null,
   )
-  const [form, setForm] = useState<ObjectiveForm>(emptyForm)
+  const [form, setForm] = useState<ReferenceForm>(emptyForm)
   const [formError, setFormError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [deletingObjective, setDeletingObjective] = useState<Objective | null>(
-    null,
-  )
+  const [deletingReference, setDeletingReference] =
+    useState<Reference | null>(null)
   const [deleting, setDeleting] = useState(false)
 
-  const loadObjectives = useCallback(async (signal?: AbortSignal) => {
+  const loadReferences = useCallback(async (signal?: AbortSignal) => {
     setLoading(true)
     setPageError(null)
 
     try {
-      const response = await fetch(objectivesUrl, { signal })
+      const response = await fetch(referencesUrl, { signal })
 
       if (!response.ok) throw new Error(await getErrorMessage(response))
 
-      setObjectives((await response.json()) as Objective[])
+      setReferences((await response.json()) as Reference[])
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return
 
       setPageError(
-        error instanceof Error ? error.message : 'Could not load objectives.',
+        error instanceof Error ? error.message : 'Could not load references.',
       )
     } finally {
       if (!signal?.aborted) setLoading(false)
@@ -94,24 +104,21 @@ export function ObjectivesPage() {
 
   useEffect(() => {
     const controller = new AbortController()
-    void loadObjectives(controller.signal)
+    void loadReferences(controller.signal)
 
     return () => controller.abort()
-  }, [loadObjectives])
+  }, [loadReferences])
 
   const openCreateForm = () => {
-    setEditingObjective(null)
+    setEditingReference(null)
     setForm(emptyForm)
     setFormError(null)
     setFormOpen(true)
   }
 
-  const openEditForm = (objective: Objective) => {
-    setEditingObjective(objective)
-    setForm({
-      title: objective.title,
-      description: objective.description,
-    })
+  const openEditForm = (reference: Reference) => {
+    setEditingReference(reference)
+    setForm({ type: reference.type, title: reference.title, url: reference.url })
     setFormError(null)
     setFormOpen(true)
   }
@@ -121,89 +128,99 @@ export function ObjectivesPage() {
   }
 
   const openDeleteConfirmation = () => {
-    if (!editingObjective) return
+    if (!editingReference) return
 
-    setDeletingObjective(editingObjective)
+    setDeletingReference(editingReference)
     setFormOpen(false)
   }
 
   const closeDeleteConfirmation = () => {
     if (deleting) return
 
-    setDeletingObjective(null)
+    setDeletingReference(null)
     setFormOpen(true)
   }
 
-  const saveObjective = async (event: FormEvent<HTMLFormElement>) => {
+  const saveReference = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setSaving(true)
     setFormError(null)
 
     try {
-      const url = editingObjective
-        ? `${objectivesUrl}${editingObjective.id}/`
-        : objectivesUrl
+      const url = editingReference
+        ? `${referencesUrl}${editingReference.id}/`
+        : referencesUrl
       const response = await fetch(url, {
-        method: editingObjective ? 'PATCH' : 'POST',
+        method: editingReference ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          type: form.type,
           title: form.title.trim(),
-          description: form.description.trim(),
+          url: form.url.trim(),
         }),
       })
 
       if (!response.ok) throw new Error(await getErrorMessage(response))
 
-      const savedObjective = (await response.json()) as Objective
-      setObjectives((currentObjectives) =>
-        editingObjective
-          ? currentObjectives.map((objective) =>
-              objective.id === savedObjective.id ? savedObjective : objective,
+      const savedReference = (await response.json()) as Reference
+      setReferences((currentReferences) =>
+        editingReference
+          ? currentReferences.map((reference) =>
+              reference.id === savedReference.id ? savedReference : reference,
             )
-          : [...currentObjectives, savedObjective],
+          : [...currentReferences, savedReference],
       )
       setFormOpen(false)
     } catch (error) {
       setFormError(
-        error instanceof Error ? error.message : 'Could not save the objective.',
+        error instanceof Error ? error.message : 'Could not save the reference.',
       )
     } finally {
       setSaving(false)
     }
   }
 
-  const deleteObjective = async () => {
-    if (!deletingObjective) return
+  const deleteReference = async () => {
+    if (!deletingReference) return
 
     setDeleting(true)
     setPageError(null)
 
     try {
-      const response = await fetch(`${objectivesUrl}${deletingObjective.id}/`, {
-        method: 'DELETE',
-      })
+      const response = await fetch(
+        `${referencesUrl}${deletingReference.id}/`,
+        { method: 'DELETE' },
+      )
 
       if (!response.ok) throw new Error(await getErrorMessage(response))
 
-      setObjectives((currentObjectives) =>
-        currentObjectives.filter(
-          (objective) => objective.id !== deletingObjective.id,
+      setReferences((currentReferences) =>
+        currentReferences.filter(
+          (reference) => reference.id !== deletingReference.id,
         ),
       )
-      setDeletingObjective(null)
-      setEditingObjective(null)
+      setDeletingReference(null)
+      setEditingReference(null)
     } catch (error) {
       setPageError(
         error instanceof Error
           ? error.message
-          : 'Could not delete the objective.',
+          : 'Could not delete the reference.',
       )
-      setDeletingObjective(null)
+      setDeletingReference(null)
       setFormOpen(true)
     } finally {
       setDeleting(false)
     }
   }
+
+  const normalizedSearchQuery = searchQuery.trim().toLocaleLowerCase()
+  const filteredReferences = references.filter((reference) =>
+    [typeLabels[reference.type], reference.title, reference.url]
+      .join(' ')
+      .toLocaleLowerCase()
+      .includes(normalizedSearchQuery),
+  )
 
   return (
     <>
@@ -213,23 +230,39 @@ export function ObjectivesPage() {
           display: 'flex',
           flexDirection: { xs: 'column', sm: 'row' },
           gap: 2,
-          justifyContent: 'flex-end',
           mb: 3,
         }}
       >
+        <TextField
+          onChange={(event) => setSearchQuery(event.target.value)}
+          placeholder="Search by title, type, URL, etc."
+          size="small"
+          slotProps={{
+            htmlInput: { 'aria-label': 'Search references' },
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+            },
+          }}
+          sx={{ flexGrow: 1, minWidth: { sm: 240 } }}
+          value={searchQuery}
+        />
         <Button
           onClick={openCreateForm}
           startIcon={<AddIcon />}
           variant="contained"
         >
-          Add objective
+          Add reference
         </Button>
       </Box>
 
       {pageError && (
         <Alert
           action={
-            <Button color="inherit" onClick={() => void loadObjectives()}>
+            <Button color="inherit" onClick={() => void loadReferences()}>
               Retry
             </Button>
           }
@@ -242,40 +275,62 @@ export function ObjectivesPage() {
 
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-          <CircularProgress aria-label="Loading objectives" />
+          <CircularProgress aria-label="Loading references" />
         </Box>
-      ) : objectives.length === 0 ? (
+      ) : references.length === 0 ? (
         <Paper sx={{ p: 4, textAlign: 'center' }} variant="outlined">
           <Typography component="h2" gutterBottom variant="h6">
-            No objectives
+            No references
           </Typography>
           <Typography color="text.secondary">
-            Add an objective to make it available for exercises.
+            Add a reference to make it available for an exercise.
           </Typography>
+        </Paper>
+      ) : filteredReferences.length === 0 ? (
+        <Paper sx={{ p: 4, textAlign: 'center' }} variant="outlined">
+          <Typography component="h2" gutterBottom variant="h6">
+            No references match your search
+          </Typography>
+          <Button color="inherit" onClick={() => setSearchQuery('')}>
+            Clear search
+          </Button>
         </Paper>
       ) : (
         <Grid container spacing={2}>
-          {objectives.map((objective) => (
-            <Grid key={objective.id} size={{ xs: 12, md: 6, xl: 4 }}>
-              <Card sx={{ height: '100%' }} variant="outlined">
+          {filteredReferences.map((reference) => (
+            <Grid key={reference.id} size={{ xs: 12, md: 6, xl: 4 }}>
+              <Card
+                sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}
+                variant="outlined"
+              >
                 <CardActionArea
-                  aria-label={`Open ${objective.title}`}
-                  onClick={() => openEditForm(objective)}
-                  sx={{ alignItems: 'stretch', display: 'flex', height: '100%' }}
+                  aria-label={`Open ${reference.title}`}
+                  onClick={() => openEditForm(reference)}
+                  sx={{ alignItems: 'stretch', display: 'flex', flexGrow: 1 }}
                 >
                   <CardContent
                     sx={{ display: 'flex', flexDirection: 'column', width: '100%' }}
                   >
                     <Typography component="h2" variant="h6">
-                      {objective.title}
+                      {reference.title}
                     </Typography>
-                    <Typography color="text.secondary" sx={{ mt: 1 }}>
-                      {objective.description}
-                    </Typography>
-                    <Typography color="text.secondary" sx={{ mt: 'auto', pt: 2 }}>
-                      Related to {objective.exercise_count}{' '}
-                      {objective.exercise_count === 1 ? 'exercise' : 'exercises'}
-                    </Typography>
+                    <Box
+                      sx={{
+                        alignItems: 'center',
+                        display: 'flex',
+                        gap: 1,
+                        mt: 'auto',
+                        pt: 2,
+                      }}
+                    >
+                      <Chip label={typeLabels[reference.type]} size="small" />
+                      <Typography color="text.secondary">
+                        Related to {reference.exercise_count}{' '}
+                        {reference.exercise_count === 1
+                          ? 'exercise'
+                          : 'exercises'}
+                      </Typography>
+                    </Box>
                   </CardContent>
                 </CardActionArea>
               </Card>
@@ -285,9 +340,9 @@ export function ObjectivesPage() {
       )}
 
       <Dialog fullWidth maxWidth="sm" onClose={closeForm} open={formOpen}>
-        <Box component="form" onSubmit={saveObjective}>
+        <Box component="form" onSubmit={saveReference}>
           <DialogTitle>
-            {editingObjective ? 'Edit objective' : 'Add objective'}
+            {editingReference ? 'Edit reference' : 'Add reference'}
           </DialogTitle>
           <DialogContent>
             {formError && (
@@ -309,53 +364,44 @@ export function ObjectivesPage() {
               required
               value={form.title}
             />
+            <FormControl fullWidth margin="dense" required>
+              <InputLabel id="reference-type-label">Type</InputLabel>
+              <Select
+                label="Type"
+                labelId="reference-type-label"
+                onChange={(event) =>
+                  setForm((currentForm) => ({
+                    ...currentForm,
+                    type: event.target.value as ReferenceType,
+                  }))
+                }
+                value={form.type}
+              >
+                {(Object.keys(typeLabels) as ReferenceType[]).map((type) => (
+                  <MenuItem key={type} value={type}>
+                    {typeLabels[type]}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
             <TextField
               fullWidth
-              label="Description"
+              label="URL"
               margin="dense"
-              minRows={4}
-              multiline
               onChange={(event) =>
                 setForm((currentForm) => ({
                   ...currentForm,
-                  description: event.target.value,
+                  url: event.target.value,
                 }))
               }
               required
-              value={form.description}
+              type="url"
+              value={form.url}
             />
-            {editingObjective && (
-              <Box sx={{ mt: 2 }}>
-                <Typography
-                  color="text.secondary"
-                  component="h3"
-                  sx={{ mb: 1 }}
-                  variant="caption"
-                >
-                  Exercises
-                </Typography>
-                {editingObjective.exercises &&
-                editingObjective.exercises.length > 0 ? (
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                    {editingObjective.exercises.map((exercise) => (
-                      <Chip
-                        key={exercise.id}
-                        label={exercise.title}
-                        size="small"
-                      />
-                    ))}
-                  </Box>
-                ) : (
-                  <Typography color="text.secondary" variant="body2">
-                    None
-                  </Typography>
-                )}
-              </Box>
-            )}
           </DialogContent>
           <DialogActions
             sx={{
-              justifyContent: editingObjective ? 'space-between' : 'flex-start',
+              justifyContent: editingReference ? 'space-between' : 'flex-start',
             }}
           >
             <Stack direction="row" spacing={1}>
@@ -366,7 +412,7 @@ export function ObjectivesPage() {
                 Cancel
               </Button>
             </Stack>
-            {editingObjective && (
+            {editingReference && (
               <Button
                 color="error"
                 disabled={saving}
@@ -382,12 +428,12 @@ export function ObjectivesPage() {
 
       <Dialog
         onClose={closeDeleteConfirmation}
-        open={Boolean(deletingObjective)}
+        open={Boolean(deletingReference)}
       >
-        <DialogTitle>Delete objective?</DialogTitle>
+        <DialogTitle>Delete reference?</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Delete “{deletingObjective?.title}”? You cannot undo this action.
+            Delete “{deletingReference?.title}”? You cannot undo this action.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
@@ -401,7 +447,7 @@ export function ObjectivesPage() {
           <Button
             color="error"
             disabled={deleting}
-            onClick={() => void deleteObjective()}
+            onClick={() => void deleteReference()}
             variant="contained"
           >
             {deleting ? 'Deleting…' : 'Delete'}

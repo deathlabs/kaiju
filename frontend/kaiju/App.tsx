@@ -15,10 +15,10 @@ import {
   DeathlabsPageHeader,
   DeathlabsThemeProvider,
 } from './components'
-import { ExercisesPage } from './ExercisesPage'
-import { MetricsPage } from './MetricsPage'
-import { ObjectivesPage } from './ObjectivesPage'
-import { ReferencesPage } from './ReferencesPage'
+import { ExercisesPage } from './pages/ExercisesPage'
+import { MetricsPage } from './pages/MetricsPage'
+import { ObjectivesPage } from './pages/ObjectivesPage'
+import { ReferencesPage } from './pages/ReferencesPage'
 
 const sideNavBar = {
   items: [

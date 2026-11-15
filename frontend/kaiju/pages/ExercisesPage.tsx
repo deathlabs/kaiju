@@ -115,7 +115,7 @@ const emptyForm: ExerciseForm = {
 
 const typeLabels: Record<ExerciseType, string> = {
   discussion: 'Discussion',
-  discussion_and_hands_on: 'Discussion and hands-on',
+  discussion_and_hands_on: 'Discussion and Hands-On',
 }
 
 const statusLabels: Record<ExerciseStatus, string> = {
@@ -819,12 +819,12 @@ export function ExercisesPage() {
                     value={form.type}
                   >
                     <MenuItem value="discussion_and_hands_on">
-                      Discussion and hands-on
+                      Discussion and Hands-On
                     </MenuItem>
                     <MenuItem value="discussion">Discussion</MenuItem>
                   </Select>
                 </FormControl>
-                <FormControl>
+                <FormControl sx={{ order: 2 }}>
                   <InputLabel id="exercise-objectives-label">
                     Objectives
                   </InputLabel>
@@ -912,7 +912,7 @@ export function ExercisesPage() {
                     ))}
                   </Select>
                 </FormControl>
-                <FormControl>
+                <FormControl sx={{ order: 3 }}>
                   <InputLabel id="exercise-references-label">
                     References
                   </InputLabel>
@@ -1058,6 +1058,7 @@ export function ExercisesPage() {
                   }
                   placeholder={defaultScenario}
                   slotProps={{ inputLabel: { shrink: true } }}
+                  sx={{ order: 1 }}
                   value={form.scenario}
                 />
             </Stack>
