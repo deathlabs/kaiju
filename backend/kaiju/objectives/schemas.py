@@ -26,14 +26,28 @@ class ObjectiveUpdateSchema(Schema):
     description: str | None = None
 
 
+class ObjectiveExerciseSchema(Schema):
+    """The exercise fields displayed for an objective relationship."""
+
+    id: UUID
+    title: str
+
+
 class ObjectiveSchema(Schema):
     """The fields of an Objective."""
 
     id: UUID
+    exercise_count: int = 0
     title: str
     description: str
     created_at: datetime
     updated_at: datetime
+
+
+class ObjectiveDetailSchema(ObjectiveSchema):
+    """The fields of an Objective and its related exercises."""
+
+    exercises: list[ObjectiveExerciseSchema]
 
 
 class NotFoundResponseSchema(Schema):

@@ -2,6 +2,7 @@
 from uuid import UUID
 
 # Third party imports.
+from django.db.models import Count
 from ninja import Router, Status
 
 # Local imports.
@@ -30,7 +31,7 @@ def create_reference(request, payload: ReferenceCreateSchema):
 @references_router.get("/", response={200: list[ReferenceSchema]})
 def list_references(request):
     """Fetch all references."""
-    return Status(200, Reference.objects.all())
+    return Status(200, Reference.objects.annotate(exercise_count=Count("exercises")))
 
 
 @references_router.get(
@@ -43,7 +44,10 @@ def list_references(request):
 def get_reference(request, reference_id: UUID):
     """Fetch a reference by its ID."""
     try:
-        return Status(200, Reference.objects.get(id=reference_id))
+        reference = Reference.objects.annotate(
+            exercise_count=Count("exercises"),
+        ).get(id=reference_id)
+        return Status(200, reference)
     except Reference.DoesNotExist:
         return Status(404, {"message": "Reference not found"})
 
@@ -66,6 +70,9 @@ def update_reference(request, reference_id: UUID, payload: ReferenceUpdateSchema
         setattr(reference, field, value)
 
     reference.save()
+    reference = Reference.objects.annotate(
+        exercise_count=Count("exercises"),
+    ).get(id=reference_id)
     return Status(200, reference)
 
 

@@ -31,6 +31,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 
 type ExerciseType = 'discussion' | 'discussion_and_hands_on'
 type ExerciseStatus = 'planned' | 'prepared' | 'in_progress' | 'completed'
+type ReferenceType = 'policy' | 'standard' | 'procedure' | 'guideline'
 
 interface ExerciseUser {
   username: string
@@ -66,12 +67,14 @@ interface NewObjective {
 
 interface Reference {
   id: string
+  type: ReferenceType
   title: string
   url: string
 }
 
 interface NewReference {
   clientId: string
+  type: ReferenceType
   title: string
   url: string
 }
@@ -120,6 +123,13 @@ const statusLabels: Record<ExerciseStatus, string> = {
   prepared: 'Prepared',
   in_progress: 'In progress',
   completed: 'Completed',
+}
+
+const referenceTypeLabels: Record<ReferenceType, string> = {
+  policy: 'Policy',
+  standard: 'Standard',
+  procedure: 'Procedure',
+  guideline: 'Guideline',
 }
 
 const getErrorMessage = async (response: Response) => {
@@ -184,6 +194,7 @@ export function ExercisesPage() {
   const [newObjectiveError, setNewObjectiveError] = useState<string | null>(null)
   const [newReferenceDialogOpen, setNewReferenceDialogOpen] = useState(false)
   const [newReferenceDraft, setNewReferenceDraft] = useState({
+    type: '' as ReferenceType | '',
     title: '',
     url: '',
   })
@@ -321,7 +332,7 @@ export function ExercisesPage() {
   }
 
   const openNewReferenceDialog = () => {
-    setNewReferenceDraft({ title: '', url: '' })
+    setNewReferenceDraft({ type: '', title: '', url: '' })
     setNewReferenceError(null)
     setNewReferenceDialogOpen(true)
   }
@@ -331,11 +342,12 @@ export function ExercisesPage() {
   }
 
   const addNewReference = () => {
+    const type = newReferenceDraft.type
     const title = newReferenceDraft.title.trim()
     const url = newReferenceDraft.url.trim()
 
-    if (!title || !url) {
-      setNewReferenceError('Enter a title and URL.')
+    if (!type || !title || !url) {
+      setNewReferenceError('Select a type and enter a title and URL.')
       return
     }
 
@@ -351,7 +363,7 @@ export function ExercisesPage() {
       ...currentForm,
       newReferences: [
         ...currentForm.newReferences,
-        { clientId: crypto.randomUUID(), title, url },
+        { clientId: crypto.randomUUID(), type, title, url },
       ],
     }))
     setNewReferenceDialogOpen(false)
@@ -430,6 +442,7 @@ export function ExercisesPage() {
             description: objective.description.trim(),
           })),
           new_references: form.newReferences.map((reference) => ({
+            type: reference.type,
             title: reference.title.trim(),
             url: reference.url.trim(),
           })),
@@ -498,6 +511,7 @@ export function ExercisesPage() {
           objective.description,
         ]),
         ...exercise.references.flatMap((reference) => [
+          referenceTypeLabels[reference.type],
           reference.title,
           reference.url,
         ]),
@@ -968,7 +982,7 @@ export function ExercisesPage() {
                         />
                         <ListItemText
                           primary={reference.title}
-                          secondary={reference.url}
+                          secondary={`${referenceTypeLabels[reference.type]} · ${reference.url}`}
                         />
                       </MenuItem>
                     ))}
@@ -980,7 +994,7 @@ export function ExercisesPage() {
                         <Checkbox checked />
                         <ListItemText
                           primary={reference.title}
-                          secondary={`${reference.url} (new)`}
+                          secondary={`${referenceTypeLabels[reference.type]} · ${reference.url} (new)`}
                         />
                       </MenuItem>
                     ))}
@@ -1163,6 +1177,28 @@ export function ExercisesPage() {
             required
             value={newReferenceDraft.title}
           />
+          <FormControl fullWidth margin="dense" required>
+            <InputLabel id="new-reference-type-label">Type</InputLabel>
+            <Select
+              label="Type"
+              labelId="new-reference-type-label"
+              onChange={(event) =>
+                setNewReferenceDraft((currentDraft) => ({
+                  ...currentDraft,
+                  type: event.target.value as ReferenceType,
+                }))
+              }
+              value={newReferenceDraft.type}
+            >
+              {(Object.keys(referenceTypeLabels) as ReferenceType[]).map(
+                (type) => (
+                  <MenuItem key={type} value={type}>
+                    {referenceTypeLabels[type]}
+                  </MenuItem>
+                ),
+              )}
+            </Select>
+          </FormControl>
           <TextField
             fullWidth
             label="URL"

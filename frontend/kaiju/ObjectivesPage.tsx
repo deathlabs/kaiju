@@ -1,29 +1,26 @@
 import AddIcon from '@mui/icons-material/Add'
-import DeleteIcon from '@mui/icons-material/Delete'
-import EditIcon from '@mui/icons-material/Edit'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
+import Card from '@mui/material/Card'
+import CardActionArea from '@mui/material/CardActionArea'
+import CardContent from '@mui/material/CardContent'
 import CircularProgress from '@mui/material/CircularProgress'
 import Dialog from '@mui/material/Dialog'
 import DialogActions from '@mui/material/DialogActions'
 import DialogContent from '@mui/material/DialogContent'
 import DialogContentText from '@mui/material/DialogContentText'
 import DialogTitle from '@mui/material/DialogTitle'
-import IconButton from '@mui/material/IconButton'
+import Grid from '@mui/material/Grid'
 import Paper from '@mui/material/Paper'
-import Table from '@mui/material/Table'
-import TableBody from '@mui/material/TableBody'
-import TableCell from '@mui/material/TableCell'
-import TableContainer from '@mui/material/TableContainer'
-import TableHead from '@mui/material/TableHead'
-import TableRow from '@mui/material/TableRow'
+import Stack from '@mui/material/Stack'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 
 interface Objective {
   id: string
+  exercise_count: number
   title: string
   description: string
   created_at: string
@@ -116,6 +113,20 @@ export function ObjectivesPage() {
     if (!saving) setFormOpen(false)
   }
 
+  const openDeleteConfirmation = () => {
+    if (!editingObjective) return
+
+    setDeletingObjective(editingObjective)
+    setFormOpen(false)
+  }
+
+  const closeDeleteConfirmation = () => {
+    if (deleting) return
+
+    setDeletingObjective(null)
+    setFormOpen(true)
+  }
+
   const saveObjective = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setSaving(true)
@@ -173,6 +184,7 @@ export function ObjectivesPage() {
         ),
       )
       setDeletingObjective(null)
+      setEditingObjective(null)
     } catch (error) {
       setPageError(
         error instanceof Error
@@ -180,6 +192,7 @@ export function ObjectivesPage() {
           : 'Could not delete the objective.',
       )
       setDeletingObjective(null)
+      setFormOpen(true)
     } finally {
       setDeleting(false)
     }
@@ -193,13 +206,10 @@ export function ObjectivesPage() {
           display: 'flex',
           flexDirection: { xs: 'column', sm: 'row' },
           gap: 2,
-          justifyContent: 'space-between',
+          justifyContent: 'flex-end',
           mb: 3,
         }}
       >
-        <Typography color="text.secondary">
-          Manage the reusable goals that exercises evaluate.
-        </Typography>
         <Button
           onClick={openCreateForm}
           startIcon={<AddIcon />}
@@ -237,40 +247,34 @@ export function ObjectivesPage() {
           </Typography>
         </Paper>
       ) : (
-        <TableContainer component={Paper} variant="outlined">
-          <Table aria-label="Objectives">
-            <TableHead>
-              <TableRow>
-                <TableCell>Title</TableCell>
-                <TableCell>Description</TableCell>
-                <TableCell align="right">Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {objectives.map((objective) => (
-                <TableRow key={objective.id}>
-                  <TableCell>{objective.title}</TableCell>
-                  <TableCell>{objective.description}</TableCell>
-                  <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
-                    <IconButton
-                      aria-label={`Edit ${objective.title}`}
-                      onClick={() => openEditForm(objective)}
-                    >
-                      <EditIcon />
-                    </IconButton>
-                    <IconButton
-                      aria-label={`Delete ${objective.title}`}
-                      color="error"
-                      onClick={() => setDeletingObjective(objective)}
-                    >
-                      <DeleteIcon />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+        <Grid container spacing={2}>
+          {objectives.map((objective) => (
+            <Grid key={objective.id} size={{ xs: 12, md: 6, xl: 4 }}>
+              <Card sx={{ height: '100%' }} variant="outlined">
+                <CardActionArea
+                  aria-label={`Open ${objective.title}`}
+                  onClick={() => openEditForm(objective)}
+                  sx={{ alignItems: 'stretch', display: 'flex', height: '100%' }}
+                >
+                  <CardContent
+                    sx={{ display: 'flex', flexDirection: 'column', width: '100%' }}
+                  >
+                    <Typography component="h2" variant="h6">
+                      {objective.title}
+                    </Typography>
+                    <Typography color="text.secondary" sx={{ mt: 1 }}>
+                      {objective.description}
+                    </Typography>
+                    <Typography color="text.secondary" sx={{ mt: 'auto', pt: 2 }}>
+                      Related to {objective.exercise_count}{' '}
+                      {objective.exercise_count === 1 ? 'exercise' : 'exercises'}
+                    </Typography>
+                  </CardContent>
+                </CardActionArea>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
       )}
 
       <Dialog fullWidth maxWidth="sm" onClose={closeForm} open={formOpen}>
@@ -314,23 +318,35 @@ export function ObjectivesPage() {
               value={form.description}
             />
           </DialogContent>
-          <DialogActions sx={{ justifyContent: 'flex-start' }}>
-            <Button disabled={saving} type="submit" variant="contained">
-              {saving ? 'Saving…' : 'Save'}
-            </Button>
-            <Button
-              color="inherit"
-              disabled={saving}
-              onClick={closeForm}
-            >
-              Cancel
-            </Button>
+          <DialogActions
+            sx={{
+              justifyContent: editingObjective ? 'space-between' : 'flex-start',
+            }}
+          >
+            <Stack direction="row" spacing={1}>
+              <Button disabled={saving} type="submit" variant="contained">
+                {saving ? 'Saving…' : 'Save'}
+              </Button>
+              <Button color="inherit" disabled={saving} onClick={closeForm}>
+                Cancel
+              </Button>
+            </Stack>
+            {editingObjective && (
+              <Button
+                color="error"
+                disabled={saving}
+                onClick={openDeleteConfirmation}
+                variant="contained"
+              >
+                Delete
+              </Button>
+            )}
           </DialogActions>
         </Box>
       </Dialog>
 
       <Dialog
-        onClose={() => !deleting && setDeletingObjective(null)}
+        onClose={closeDeleteConfirmation}
         open={Boolean(deletingObjective)}
       >
         <DialogTitle>Delete objective?</DialogTitle>
@@ -343,7 +359,7 @@ export function ObjectivesPage() {
           <Button
             color="inherit"
             disabled={deleting}
-            onClick={() => setDeletingObjective(null)}
+            onClick={closeDeleteConfirmation}
           >
             Cancel
           </Button>

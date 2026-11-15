@@ -123,6 +123,7 @@ class AuthenticationTests(TestCase):
             description="Validate the escalation process.",
         )
         Reference.objects.create(
+            type=Reference.Type.GUIDELINE,
             title="Response plan",
             url="https://example.com/response-plan",
         )
@@ -144,6 +145,32 @@ class AuthenticationTests(TestCase):
                 "users": 2,
             },
         )
+
+    def test_reference_creation_requires_a_supported_type(self):
+        payload = {
+            "type": "standard",
+            "title": "Access control standard",
+            "url": "https://example.com/access-control-standard",
+        }
+
+        with self._settings():
+            response = self.client.post(
+                "/api/v1/references/",
+                data=json.dumps(payload),
+                content_type="application/json",
+                **self._authorization(self._token()),
+            )
+            invalid_response = self.client.post(
+                "/api/v1/references/",
+                data=json.dumps({**payload, "type": "memo"}),
+                content_type="application/json",
+                **self._authorization(self._token()),
+            )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["type"], "standard")
+        self.assertEqual(Reference.objects.get().type, Reference.Type.STANDARD)
+        self.assertEqual(invalid_response.status_code, 422)
 
     def test_missing_token_is_rejected(self):
         with self._settings():
@@ -276,6 +303,7 @@ class AuthenticationTests(TestCase):
             description="Validate the escalation process.",
         )
         reference = Reference.objects.create(
+            type=Reference.Type.GUIDELINE,
             title="Incident response plan",
             url="https://example.com/incident-response-plan",
         )
@@ -289,6 +317,14 @@ class AuthenticationTests(TestCase):
                 "/api/v1/exercises/",
                 **self._authorization(self._token()),
             )
+            references_response = self.client.get(
+                "/api/v1/references/",
+                **self._authorization(self._token()),
+            )
+            objectives_response = self.client.get(
+                "/api/v1/objectives/",
+                **self._authorization(self._token()),
+            )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
@@ -297,6 +333,14 @@ class AuthenticationTests(TestCase):
         )
         self.assertEqual(response.json()[0]["objectives"][0]["id"], str(objective.id))
         self.assertEqual(response.json()[0]["references"][0]["id"], str(reference.id))
+        self.assertEqual(references_response.status_code, 200)
+        self.assertEqual(references_response.json()[0]["exercise_count"], 1)
+        self.assertEqual(objectives_response.status_code, 200)
+        self.assertEqual(objectives_response.json()[0]["exercise_count"], 1)
+        self.assertEqual(
+            objectives_response.json()[0]["exercises"][0]["title"],
+            "Incident response exercise",
+        )
 
     def test_exercise_creation_creates_and_attaches_objectives(self):
         existing_objective = Objective.objects.create(
@@ -339,6 +383,7 @@ class AuthenticationTests(TestCase):
 
     def test_exercise_creation_attaches_references(self):
         reference = Reference.objects.create(
+            type=Reference.Type.GUIDELINE,
             title="Incident response plan",
             url="https://example.com/incident-response-plan",
         )
@@ -358,6 +403,7 @@ class AuthenticationTests(TestCase):
             "scenario": "Unknown outbound traffic was observed.",
             "new_references": [
                 {
+                    "type": "guideline",
                     "title": "Incident response plan",
                     "url": "https://example.com/incident-response-plan",
                 }
@@ -464,6 +510,7 @@ class AuthenticationTests(TestCase):
                     {
                         "new_references": [
                             {
+                                "type": "guideline",
                                 "title": "Incident response plan",
                                 "url": "https://example.com/incident-response-plan",
                             }

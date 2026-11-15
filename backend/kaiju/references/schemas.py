@@ -6,6 +6,9 @@ from uuid import UUID
 from ninja import Schema
 from pydantic import AnyHttpUrl
 
+# Local imports.
+from references.models import Reference
+
 
 class BadRequestResponseSchema(Schema):
     """The fields returned when a request is invalid."""
@@ -16,6 +19,7 @@ class BadRequestResponseSchema(Schema):
 class ReferenceCreateSchema(Schema):
     """The fields required to create a Reference."""
 
+    type: Reference.Type
     title: str
     url: AnyHttpUrl
 
@@ -23,6 +27,7 @@ class ReferenceCreateSchema(Schema):
 class ReferenceUpdateSchema(Schema):
     """The fields that can be updated on a Reference."""
 
+    type: Reference.Type | None = None
     title: str | None = None
     url: AnyHttpUrl | None = None
 
@@ -31,6 +36,8 @@ class ReferenceSchema(Schema):
     """The fields of a Reference."""
 
     id: UUID
+    exercise_count: int = 0
+    type: Reference.Type
     title: str
     url: AnyHttpUrl
     created_at: datetime

@@ -1,30 +1,34 @@
 import AddIcon from '@mui/icons-material/Add'
-import DeleteIcon from '@mui/icons-material/Delete'
-import EditIcon from '@mui/icons-material/Edit'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
+import Card from '@mui/material/Card'
+import CardActionArea from '@mui/material/CardActionArea'
+import CardContent from '@mui/material/CardContent'
+import Chip from '@mui/material/Chip'
 import CircularProgress from '@mui/material/CircularProgress'
 import Dialog from '@mui/material/Dialog'
 import DialogActions from '@mui/material/DialogActions'
 import DialogContent from '@mui/material/DialogContent'
 import DialogContentText from '@mui/material/DialogContentText'
 import DialogTitle from '@mui/material/DialogTitle'
-import IconButton from '@mui/material/IconButton'
-import Link from '@mui/material/Link'
+import FormControl from '@mui/material/FormControl'
+import Grid from '@mui/material/Grid'
+import InputLabel from '@mui/material/InputLabel'
+import MenuItem from '@mui/material/MenuItem'
 import Paper from '@mui/material/Paper'
-import Table from '@mui/material/Table'
-import TableBody from '@mui/material/TableBody'
-import TableCell from '@mui/material/TableCell'
-import TableContainer from '@mui/material/TableContainer'
-import TableHead from '@mui/material/TableHead'
-import TableRow from '@mui/material/TableRow'
+import Select from '@mui/material/Select'
+import Stack from '@mui/material/Stack'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 
+type ReferenceType = 'policy' | 'standard' | 'procedure' | 'guideline'
+
 interface Reference {
   id: string
+  exercise_count: number
+  type: ReferenceType
   title: string
   url: string
   created_at: string
@@ -32,12 +36,19 @@ interface Reference {
 }
 
 interface ReferenceForm {
+  type: ReferenceType | ''
   title: string
   url: string
 }
 
 const referencesUrl = '/api/v1/references/'
-const emptyForm: ReferenceForm = { title: '', url: '' }
+const emptyForm: ReferenceForm = { type: '', title: '', url: '' }
+const typeLabels: Record<ReferenceType, string> = {
+  policy: 'Policy',
+  standard: 'Standard',
+  procedure: 'Procedure',
+  guideline: 'Guideline',
+}
 
 const getErrorMessage = async (response: Response) => {
   try {
@@ -104,13 +115,27 @@ export function ReferencesPage() {
 
   const openEditForm = (reference: Reference) => {
     setEditingReference(reference)
-    setForm({ title: reference.title, url: reference.url })
+    setForm({ type: reference.type, title: reference.title, url: reference.url })
     setFormError(null)
     setFormOpen(true)
   }
 
   const closeForm = () => {
     if (!saving) setFormOpen(false)
+  }
+
+  const openDeleteConfirmation = () => {
+    if (!editingReference) return
+
+    setDeletingReference(editingReference)
+    setFormOpen(false)
+  }
+
+  const closeDeleteConfirmation = () => {
+    if (deleting) return
+
+    setDeletingReference(null)
+    setFormOpen(true)
   }
 
   const saveReference = async (event: FormEvent<HTMLFormElement>) => {
@@ -126,6 +151,7 @@ export function ReferencesPage() {
         method: editingReference ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          type: form.type,
           title: form.title.trim(),
           url: form.url.trim(),
         }),
@@ -171,6 +197,7 @@ export function ReferencesPage() {
         ),
       )
       setDeletingReference(null)
+      setEditingReference(null)
     } catch (error) {
       setPageError(
         error instanceof Error
@@ -178,6 +205,7 @@ export function ReferencesPage() {
           : 'Could not delete the reference.',
       )
       setDeletingReference(null)
+      setFormOpen(true)
     } finally {
       setDeleting(false)
     }
@@ -191,13 +219,10 @@ export function ReferencesPage() {
           display: 'flex',
           flexDirection: { xs: 'column', sm: 'row' },
           gap: 2,
-          justifyContent: 'space-between',
+          justifyContent: 'flex-end',
           mb: 3,
         }}
       >
-        <Typography color="text.secondary">
-          Manage the plans, policies, and resources used in exercises.
-        </Typography>
         <Button
           onClick={openCreateForm}
           startIcon={<AddIcon />}
@@ -235,48 +260,47 @@ export function ReferencesPage() {
           </Typography>
         </Paper>
       ) : (
-        <TableContainer component={Paper} variant="outlined">
-          <Table aria-label="References">
-            <TableHead>
-              <TableRow>
-                <TableCell>Title</TableCell>
-                <TableCell>URL</TableCell>
-                <TableCell align="right">Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {references.map((reference) => (
-                <TableRow key={reference.id}>
-                  <TableCell>{reference.title}</TableCell>
-                  <TableCell>
-                    <Link
-                      href={reference.url}
-                      rel="noopener noreferrer"
-                      target="_blank"
+        <Grid container spacing={2}>
+          {references.map((reference) => (
+            <Grid key={reference.id} size={{ xs: 12, md: 6, xl: 4 }}>
+              <Card
+                sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}
+                variant="outlined"
+              >
+                <CardActionArea
+                  aria-label={`Open ${reference.title}`}
+                  onClick={() => openEditForm(reference)}
+                  sx={{ alignItems: 'stretch', display: 'flex', flexGrow: 1 }}
+                >
+                  <CardContent
+                    sx={{ display: 'flex', flexDirection: 'column', width: '100%' }}
+                  >
+                    <Typography component="h2" variant="h6">
+                      {reference.title}
+                    </Typography>
+                    <Box
+                      sx={{
+                        alignItems: 'center',
+                        display: 'flex',
+                        gap: 1,
+                        mt: 'auto',
+                        pt: 2,
+                      }}
                     >
-                      {reference.url}
-                    </Link>
-                  </TableCell>
-                  <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
-                    <IconButton
-                      aria-label={`Edit ${reference.title}`}
-                      onClick={() => openEditForm(reference)}
-                    >
-                      <EditIcon />
-                    </IconButton>
-                    <IconButton
-                      aria-label={`Delete ${reference.title}`}
-                      color="error"
-                      onClick={() => setDeletingReference(reference)}
-                    >
-                      <DeleteIcon />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+                      <Chip label={typeLabels[reference.type]} size="small" />
+                      <Typography color="text.secondary">
+                        Related to {reference.exercise_count}{' '}
+                        {reference.exercise_count === 1
+                          ? 'exercise'
+                          : 'exercises'}
+                      </Typography>
+                    </Box>
+                  </CardContent>
+                </CardActionArea>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
       )}
 
       <Dialog fullWidth maxWidth="sm" onClose={closeForm} open={formOpen}>
@@ -304,6 +328,26 @@ export function ReferencesPage() {
               required
               value={form.title}
             />
+            <FormControl fullWidth margin="dense" required>
+              <InputLabel id="reference-type-label">Type</InputLabel>
+              <Select
+                label="Type"
+                labelId="reference-type-label"
+                onChange={(event) =>
+                  setForm((currentForm) => ({
+                    ...currentForm,
+                    type: event.target.value as ReferenceType,
+                  }))
+                }
+                value={form.type}
+              >
+                {(Object.keys(typeLabels) as ReferenceType[]).map((type) => (
+                  <MenuItem key={type} value={type}>
+                    {typeLabels[type]}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
             <TextField
               fullWidth
               label="URL"
@@ -319,23 +363,35 @@ export function ReferencesPage() {
               value={form.url}
             />
           </DialogContent>
-          <DialogActions sx={{ justifyContent: 'flex-start' }}>
-            <Button disabled={saving} type="submit" variant="contained">
-              {saving ? 'Saving…' : 'Save'}
-            </Button>
-            <Button
-              color="inherit"
-              disabled={saving}
-              onClick={closeForm}
-            >
-              Cancel
-            </Button>
+          <DialogActions
+            sx={{
+              justifyContent: editingReference ? 'space-between' : 'flex-start',
+            }}
+          >
+            <Stack direction="row" spacing={1}>
+              <Button disabled={saving} type="submit" variant="contained">
+                {saving ? 'Saving…' : 'Save'}
+              </Button>
+              <Button color="inherit" disabled={saving} onClick={closeForm}>
+                Cancel
+              </Button>
+            </Stack>
+            {editingReference && (
+              <Button
+                color="error"
+                disabled={saving}
+                onClick={openDeleteConfirmation}
+                variant="contained"
+              >
+                Delete
+              </Button>
+            )}
           </DialogActions>
         </Box>
       </Dialog>
 
       <Dialog
-        onClose={() => !deleting && setDeletingReference(null)}
+        onClose={closeDeleteConfirmation}
         open={Boolean(deletingReference)}
       >
         <DialogTitle>Delete reference?</DialogTitle>
@@ -346,8 +402,9 @@ export function ReferencesPage() {
         </DialogContent>
         <DialogActions>
           <Button
+            color="inherit"
             disabled={deleting}
-            onClick={() => setDeletingReference(null)}
+            onClick={closeDeleteConfirmation}
           >
             Cancel
           </Button>
