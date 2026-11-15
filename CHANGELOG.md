@@ -8,6 +8,7 @@
 - Added Deathlabs-prefixed layout, navigation with purpose-specific icons, classification, and theme components to frontend version 0.1.0. The frontend remains at version 0.1.0.
 - Added Exercises, Objectives, and References placeholder pages to frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 - Added interactive objective cards with related exercise counts, modal-based management, and consistent exercise dropdown creation to frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Added related exercise identification to the edit objective modal in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 - Added interactive typed reference cards with related exercise counts and modal-based create, edit, and delete functions to frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 - Added exercise search across titles, scenarios, authors, and related records, plus type, objective, and reference filters to frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 - Added a current-user display and logout action to frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.

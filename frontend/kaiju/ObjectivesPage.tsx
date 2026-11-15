@@ -5,6 +5,7 @@ import Button from '@mui/material/Button'
 import Card from '@mui/material/Card'
 import CardActionArea from '@mui/material/CardActionArea'
 import CardContent from '@mui/material/CardContent'
+import Chip from '@mui/material/Chip'
 import CircularProgress from '@mui/material/CircularProgress'
 import Dialog from '@mui/material/Dialog'
 import DialogActions from '@mui/material/DialogActions'
@@ -18,9 +19,15 @@ import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 
+interface ObjectiveExercise {
+  id: string
+  title: string
+}
+
 interface Objective {
   id: string
   exercise_count: number
+  exercises?: ObjectiveExercise[]
   title: string
   description: string
   created_at: string
@@ -317,6 +324,34 @@ export function ObjectivesPage() {
               required
               value={form.description}
             />
+            {editingObjective && (
+              <Box sx={{ mt: 2 }}>
+                <Typography
+                  color="text.secondary"
+                  component="h3"
+                  sx={{ mb: 1 }}
+                  variant="caption"
+                >
+                  Exercises
+                </Typography>
+                {editingObjective.exercises &&
+                editingObjective.exercises.length > 0 ? (
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                    {editingObjective.exercises.map((exercise) => (
+                      <Chip
+                        key={exercise.id}
+                        label={exercise.title}
+                        size="small"
+                      />
+                    ))}
+                  </Box>
+                ) : (
+                  <Typography color="text.secondary" variant="body2">
+                    None
+                  </Typography>
+                )}
+              </Box>
+            )}
           </DialogContent>
           <DialogActions
             sx={{
