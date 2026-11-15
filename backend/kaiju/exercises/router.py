@@ -2,11 +2,10 @@
 from uuid import UUID
 
 # Third party imports.
+from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.db.models import QuerySet
 from ninja import Router, Status
-from objectives.models import Objective
-from references.models import Reference
 
 # Local imports.
 from exercises.models import (
@@ -40,6 +39,8 @@ from exercises.schemas import (
     ResponseCreateSchema,
     ResponseSchema,
 )
+from objectives.models import Objective
+from references.models import Reference
 
 # Init the exercises router.
 exercises_router = Router(tags=["exercises"])
@@ -100,6 +101,14 @@ def create_exercise(request, payload: ExerciseCreateSchema):
     new_reference_data = data.pop("new_references")
     objective_ids = data.pop("objective_ids")
     reference_ids = data.pop("reference_ids")
+    facilitator_username = data.pop("facilitator_username")
+    facilitator = request.user
+    if facilitator_username:
+        try:
+            facilitator = get_user_model().objects.get(username=facilitator_username)
+        except get_user_model().DoesNotExist:
+            return Status(400, {"message": "The selected facilitator does not exist"})
+
     objectives, invalid_ids = _get_objectives(
         objective_ids,
         Objective.objects.all(),
@@ -133,9 +142,9 @@ def create_exercise(request, payload: ExerciseCreateSchema):
 
     Participant.objects.create(
         exercise=exercise,
-        first_name=request.user.first_name,
-        last_name=request.user.last_name,
-        email=request.user.email or None,
+        first_name=facilitator.first_name,
+        last_name=facilitator.last_name,
+        email=facilitator.email or None,
         role=Participant.Role.FACILITATOR,
     )
 
@@ -691,6 +700,16 @@ def update_inject(
         return Status(404, {"message": "Inject not found"})
 
     data = payload.model_dump(exclude_unset=True)
+
+    recipient_id = data.pop("recipient_id", None)
+    if recipient_id is not None:
+        try:
+            inject.recipient = Participant.objects.get(
+                id=recipient_id,
+                exercise_id=exercise_id,
+            )
+        except Participant.DoesNotExist:
+            return Status(404, {"message": "Participant not found"})
 
     for field, value in data.items():
         setattr(inject, field, value)

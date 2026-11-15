@@ -29,6 +29,8 @@ import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 
+import { ExerciseWorkspace } from './ExerciseWorkspace'
+
 type ExerciseType = 'discussion' | 'discussion_and_hands_on'
 type ExerciseStatus = 'planned' | 'prepared' | 'in_progress' | 'completed'
 type ReferenceType = 'policy' | 'standard' | 'procedure' | 'guideline'
@@ -39,7 +41,12 @@ interface ExerciseUser {
   last_name: string
 }
 
-interface Exercise {
+interface SelectableUser {
+  username: string
+  display_name: string
+}
+
+interface ExerciseSummary {
   id: string
   created_by: ExerciseUser
   updated_by: ExerciseUser
@@ -80,6 +87,7 @@ interface NewReference {
 }
 
 interface ExerciseForm {
+  facilitatorUsername: string
   newObjectives: NewObjective[]
   newReferences: NewReference[]
   objectiveIds: string[]
@@ -94,6 +102,8 @@ interface ExerciseForm {
 const exercisesUrl = '/api/v1/exercises/'
 const objectivesUrl = '/api/v1/objectives/'
 const referencesUrl = '/api/v1/references/'
+const currentUserUrl = '/api/v1/me'
+const usersUrl = '/api/v1/users'
 const createObjectiveValue = 'create-objective'
 const createReferenceValue = 'create-reference'
 const newObjectiveValuePrefix = 'new-objective:'
@@ -102,6 +112,7 @@ const defaultTitle = 'Unknown Outbound Network Activity'
 const defaultScenario =
   'At 0400, unknown outbound network activity was observed from the production environment.'
 const emptyForm: ExerciseForm = {
+  facilitatorUsername: '',
   newObjectives: [],
   newReferences: [],
   objectiveIds: [],
@@ -171,9 +182,11 @@ const formatUserName = (user: ExerciseUser) => {
 }
 
 export function ExercisesPage() {
-  const [exercises, setExercises] = useState<Exercise[]>([])
+  const [exercises, setExercises] = useState<ExerciseSummary[]>([])
   const [objectives, setObjectives] = useState<Objective[]>([])
   const [references, setReferences] = useState<Reference[]>([])
+  const [users, setUsers] = useState<SelectableUser[]>([])
+  const [currentUsername, setCurrentUsername] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [typeFilters, setTypeFilters] = useState<ExerciseType[]>([])
   const [objectiveFilterIds, setObjectiveFilterIds] = useState<string[]>([])
@@ -182,7 +195,9 @@ export function ExercisesPage() {
   const [pageError, setPageError] = useState<string | null>(null)
   const [formOpen, setFormOpen] = useState(false)
   const [editingExercise, setEditingExercise] =
-    useState<Exercise | null>(null)
+    useState<ExerciseSummary | null>(null)
+  const [workspaceExercise, setWorkspaceExercise] =
+    useState<ExerciseSummary | null>(null)
   const [form, setForm] = useState<ExerciseForm>(emptyForm)
   const [formError, setFormError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -200,7 +215,7 @@ export function ExercisesPage() {
   })
   const [newReferenceError, setNewReferenceError] = useState<string | null>(null)
   const [deletingExercise, setDeletingExercise] =
-    useState<Exercise | null>(null)
+    useState<ExerciseSummary | null>(null)
   const [deleting, setDeleting] = useState(false)
 
   const loadExercises = useCallback(async (signal?: AbortSignal) => {
@@ -208,10 +223,18 @@ export function ExercisesPage() {
     setPageError(null)
 
     try {
-      const [exercisesResponse, objectivesResponse, referencesResponse] = await Promise.all([
+      const [
+        exercisesResponse,
+        objectivesResponse,
+        referencesResponse,
+        currentUserResponse,
+        usersResponse,
+      ] = await Promise.all([
         fetch(exercisesUrl, { signal }),
         fetch(objectivesUrl, { signal }),
         fetch(referencesUrl, { signal }),
+        fetch(currentUserUrl, { signal }),
+        fetch(usersUrl, { signal }),
       ])
 
       if (!exercisesResponse.ok) {
@@ -223,10 +246,20 @@ export function ExercisesPage() {
       if (!referencesResponse.ok) {
         throw new Error(await getErrorMessage(referencesResponse))
       }
+      if (!currentUserResponse.ok) {
+        throw new Error(await getErrorMessage(currentUserResponse))
+      }
+      if (!usersResponse.ok) {
+        throw new Error(await getErrorMessage(usersResponse))
+      }
 
-      setExercises((await exercisesResponse.json()) as Exercise[])
+      setExercises((await exercisesResponse.json()) as ExerciseSummary[])
       setObjectives((await objectivesResponse.json()) as Objective[])
       setReferences((await referencesResponse.json()) as Reference[])
+      setCurrentUsername(
+        ((await currentUserResponse.json()) as SelectableUser).username,
+      )
+      setUsers((await usersResponse.json()) as SelectableUser[])
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return
 
@@ -251,6 +284,7 @@ export function ExercisesPage() {
     setEditingExercise(null)
     setForm({
       ...emptyForm,
+      facilitatorUsername: currentUsername,
       scheduledStartTime: formatDateTimeLocal(scheduledStart),
       scheduledEndTime: formatDateTimeLocal(
         new Date(scheduledStart.getTime() + 24 * 60 * 60 * 1000),
@@ -260,7 +294,7 @@ export function ExercisesPage() {
     setFormOpen(true)
   }
 
-  const openEditForm = async (exercise: Exercise) => {
+  const openEditForm = async (exercise: ExerciseSummary) => {
     setPageError(null)
 
     try {
@@ -268,9 +302,10 @@ export function ExercisesPage() {
 
       if (!response.ok) throw new Error(await getErrorMessage(response))
 
-      const exerciseDetails = (await response.json()) as Exercise
+      const exerciseDetails = (await response.json()) as ExerciseSummary
       setEditingExercise(exerciseDetails)
       setForm({
+        facilitatorUsername: '',
         newObjectives: [],
         newReferences: [],
         objectiveIds: exerciseDetails.objectives.map(
@@ -448,6 +483,9 @@ export function ExercisesPage() {
           })),
           objective_ids: form.objectiveIds,
           reference_ids: form.referenceIds,
+          ...(!editingExercise && {
+            facilitator_username: form.facilitatorUsername,
+          }),
           title: form.title.trim() || defaultTitle,
           type: form.type,
           scheduled_start_time: new Date(form.scheduledStartTime).toISOString(),
@@ -458,7 +496,7 @@ export function ExercisesPage() {
 
       if (!response.ok) throw new Error(await getErrorMessage(response))
 
-      const savedExercise = (await response.json()) as Exercise
+      const savedExercise = (await response.json()) as ExerciseSummary
       setObjectives((currentObjectives) => [
         ...currentObjectives,
         ...savedExercise.objectives.filter(
@@ -720,8 +758,8 @@ export function ExercisesPage() {
             <Grid key={exercise.id} size={{ xs: 12, md: 6, xl: 4 }}>
               <Card variant="outlined">
                 <CardActionArea
-                  aria-label={`Edit ${exercise.title}`}
-                  onClick={() => void openEditForm(exercise)}
+                  aria-label={`Open ${exercise.title}`}
+                  onClick={() => setWorkspaceExercise(exercise)}
                 >
                   <CardContent>
                     <Stack
@@ -778,6 +816,17 @@ export function ExercisesPage() {
         </Grid>
       )}
 
+      <ExerciseWorkspace
+        exerciseId={workspaceExercise?.id ?? null}
+        onClose={() => setWorkspaceExercise(null)}
+        onEdit={() => {
+          if (!workspaceExercise) return
+          const exercise = workspaceExercise
+          setWorkspaceExercise(null)
+          void openEditForm(exercise)
+        }}
+      />
+
       <Dialog fullWidth maxWidth="md" onClose={closeForm} open={formOpen}>
         <Box component="form" onSubmit={saveExercise}>
           <DialogTitle>
@@ -791,8 +840,36 @@ export function ExercisesPage() {
             )}
 
             <Stack spacing={2} sx={{ pt: 1 }}>
+                {!editingExercise && (
+                  <FormControl required>
+                    <InputLabel id="exercise-facilitator-label">
+                      Facilitator
+                    </InputLabel>
+                    <Select
+                      autoFocus
+                      label="Facilitator"
+                      labelId="exercise-facilitator-label"
+                      onChange={(event) =>
+                        setForm((currentForm) => ({
+                          ...currentForm,
+                          facilitatorUsername: event.target.value,
+                        }))
+                      }
+                      value={form.facilitatorUsername}
+                    >
+                      {users.map((user) => (
+                        <MenuItem key={user.username} value={user.username}>
+                          <ListItemText
+                            primary={user.display_name}
+                            secondary={user.username}
+                          />
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                )}
                 <TextField
-                  autoFocus
+                  autoFocus={Boolean(editingExercise)}
                   fullWidth
                   label="Title"
                   onChange={(event) =>

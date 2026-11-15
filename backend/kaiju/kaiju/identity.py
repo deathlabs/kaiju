@@ -16,6 +16,13 @@ class CurrentUserSchema(Schema):
     email: str
 
 
+class UserSchema(Schema):
+    """The user fields displayed in selection controls."""
+
+    username: str
+    display_name: str
+
+
 class MetricsSchema(Schema):
     """The application record counts."""
 
@@ -42,6 +49,25 @@ def get_current_user(request):
             "display_name": display_name,
             "email": request.user.email,
         },
+    )
+
+
+@identity_router.get(
+    "/users",
+    response={200: list[UserSchema]},
+)
+def list_users(request):
+    """Fetch the users available for selection."""
+    users = get_user_model().objects.order_by("first_name", "last_name", "username")
+    return Status(
+        200,
+        [
+            {
+                "username": user.get_username(),
+                "display_name": user.get_full_name() or user.get_username(),
+            }
+            for user in users
+        ],
     )
 
 

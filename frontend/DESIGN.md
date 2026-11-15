@@ -117,7 +117,8 @@ Inter for headings and body. Avoid mixing extra families without tokens.
 
 ## Layout
 
-Use the spacing scale in front matter. Default stack gap: `{spacing.md}`.
+* Use the spacing scale in front matter. Default stack gap: `{spacing.md}`.
+* For modals, put buttons that save or modify data on the bottom left of the modal. On the right of these buttons, put cancel. On the far right of the modal, when applicable, put the delete button and only use the word "Delete". 
 
 ## Components
 

@@ -14,8 +14,12 @@
 - Added objective and reference search across their primary fields and related records to frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 - Added a current-user display and logout action to frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 - Added validated OIDC bearer authentication and signed local development tokens to backend version 0.1.0. The backend remains at version 0.1.0 from version 0.1.0.
+- Added an exercise workspace with overview, event, and inject management to frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 
 ### Changed
+- Updated backend version 0.1.0 to delete injects and participants with their exercise. The backend remains at version 0.1.0 from version 0.1.0.
+- Updated exercise creation to select an application user as the facilitator in backend and frontend version 0.1.0. Both components remain at version 0.1.0 from version 0.1.0.
+- Updated the exercise Overview to show facilitators before other exercise information in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 - Organized the page modules in a dedicated `pages` directory in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 - Moved exercise objectives and references after the scenario field and standardized the Discussion and Hands-On label in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 - Updated the edit objective modal with clickable related exercises and read-only exercise information in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
@@ -29,5 +33,6 @@
 - Updated frontend version 0.1.0 to require zlib 1.4-r0 or later. The frontend remains at version 0.1.0 from version 0.1.0.
 - Updated all frontend user-menu links to open the Kaiju GitHub repository. The frontend remains at version 0.1.0 from version 0.1.0.
 - Updated frontend version 0.1.0 to use an explicit non-root security context and writable Nginx runtime volumes. The frontend remains at version 0.1.0 from version 0.1.0.
+- Restricted inject recipient updates to participants in the same exercise in backend version 0.1.0. The backend remains at version 0.1.0 from version 0.1.0.
 
 [0.1.0]: https://github.com/deathlabs/kaiju/releases/tag/0.1.0

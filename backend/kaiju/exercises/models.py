@@ -151,7 +151,7 @@ class Inject(models.Model):
     recipient = models.ForeignKey(
         Participant,
         related_name="injects_received",
-        on_delete=models.PROTECT,
+        on_delete=models.CASCADE,
     )
     number = models.CharField(max_length=10)
     delivery_method = models.CharField(
