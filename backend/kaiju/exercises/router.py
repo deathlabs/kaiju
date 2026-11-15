@@ -205,6 +205,14 @@ def update_exercise(request, exercise_id: UUID, payload: ExerciseUpdateSchema):
     new_reference_data = data.pop("new_references", None)
     reference_ids = data.pop("reference_ids", None)
     objective_ids = data.pop("objective_ids", None)
+    facilitator_username = data.pop("facilitator_username", None)
+
+    facilitator = None
+    if facilitator_username is not None:
+        try:
+            facilitator = get_user_model().objects.get(username=facilitator_username)
+        except get_user_model().DoesNotExist:
+            return Status(400, {"message": "The selected facilitator does not exist"})
 
     objectives = None
     if objective_ids is not None:
@@ -274,6 +282,30 @@ def update_exercise(request, exercise_id: UUID, payload: ExerciseUpdateSchema):
 
     if reference_ids is not None or new_reference_data:
         exercise.references.set(references)
+
+    if facilitator is not None:
+        current_facilitator = (
+            exercise.participants.filter(
+                role=Participant.Role.FACILITATOR,
+            )
+            .order_by("created_at")
+            .first()
+        )
+        selected_participant = exercise.participants.filter(
+            email=facilitator.email,
+        ).first()
+
+        if selected_participant is None:
+            selected_participant = current_facilitator or Participant(exercise=exercise)
+        elif current_facilitator and selected_participant != current_facilitator:
+            current_facilitator.role = Participant.Role.USER
+            current_facilitator.save(update_fields=["role", "updated_at"])
+
+        selected_participant.first_name = facilitator.first_name
+        selected_participant.last_name = facilitator.last_name
+        selected_participant.email = facilitator.email or None
+        selected_participant.role = Participant.Role.FACILITATOR
+        selected_participant.save()
 
     return Status(200, exercise)
 
@@ -461,6 +493,7 @@ def create_event(request, exercise_id: UUID, payload: EventCreateSchema):
         return Status(404, {"message": "Exercise not found"})
 
     data = payload.model_dump()
+    new_objective_data = data.pop("new_objectives")
     objective_ids = data.pop("objective_ids")
     objectives, invalid_ids = _get_objectives(
         objective_ids,
@@ -468,6 +501,13 @@ def create_event(request, exercise_id: UUID, payload: EventCreateSchema):
     )
     if invalid_ids:
         return Status(400, {"message": _invalid_objectives_message(invalid_ids)})
+
+    new_objectives = [
+        Objective.objects.create(**objective_data)
+        for objective_data in new_objective_data
+    ]
+    exercise.objectives.add(*new_objectives)
+    objectives.extend(new_objectives)
 
     event = Event.objects.create(
         exercise=exercise,
@@ -545,6 +585,7 @@ def update_event(
 
     data = payload.model_dump(exclude_unset=True)
 
+    new_objective_data = data.pop("new_objectives", None)
     objective_ids = data.pop("objective_ids", None)
 
     objectives = None
@@ -556,12 +597,22 @@ def update_event(
         if invalid_ids:
             return Status(400, {"message": _invalid_objectives_message(invalid_ids)})
 
+    if new_objective_data:
+        if objectives is None:
+            objectives = list(event.objectives.all())
+        new_objectives = [
+            Objective.objects.create(**objective_data)
+            for objective_data in new_objective_data
+        ]
+        event.exercise.objectives.add(*new_objectives)
+        objectives.extend(new_objectives)
+
     for field, value in data.items():
         setattr(event, field, value)
 
     event.save()
 
-    if objective_ids is not None:
+    if objective_ids is not None or new_objective_data:
         event.objectives.set(objectives)
 
     return Status(200, event)
@@ -611,21 +662,9 @@ def create_inject(
     except Event.DoesNotExist:
         return Status(404, {"message": "Event not found"})
 
-    data = payload.model_dump()
-    recipient_id = data.pop("recipient_id")
-
-    try:
-        recipient = Participant.objects.get(
-            id=recipient_id,
-            exercise_id=exercise_id,
-        )
-    except Participant.DoesNotExist:
-        return Status(404, {"message": "Participant not found"})
-
     inject = Inject.objects.create(
         event=event,
-        recipient=recipient,
-        **data,
+        **payload.model_dump(),
     )
 
     return Status(201, inject)
@@ -699,19 +738,7 @@ def update_inject(
     except Inject.DoesNotExist:
         return Status(404, {"message": "Inject not found"})
 
-    data = payload.model_dump(exclude_unset=True)
-
-    recipient_id = data.pop("recipient_id", None)
-    if recipient_id is not None:
-        try:
-            inject.recipient = Participant.objects.get(
-                id=recipient_id,
-                exercise_id=exercise_id,
-            )
-        except Participant.DoesNotExist:
-            return Status(404, {"message": "Participant not found"})
-
-    for field, value in data.items():
+    for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(inject, field, value)
 
     inject.save()

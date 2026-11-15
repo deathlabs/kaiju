@@ -94,7 +94,9 @@ dev:
 	export PGHOST=localhost && \
 	unset VIRTUAL_ENV && \
 	cd kaiju && \
-	uv run python manage.py migrate
+	uv run python manage.py migrate && \
+	echo "[*] Seeding $(APP)'s local development data" && \
+	uv run python manage.py seed
 
 	echo "[*] Starting $(APP)'s backend and frontend"
 	APP="$(APP)" \

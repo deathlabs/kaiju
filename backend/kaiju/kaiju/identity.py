@@ -21,6 +21,8 @@ class UserSchema(Schema):
 
     username: str
     display_name: str
+    first_name: str
+    last_name: str
 
 
 class MetricsSchema(Schema):
@@ -65,6 +67,8 @@ def list_users(request):
             {
                 "username": user.get_username(),
                 "display_name": user.get_full_name() or user.get_username(),
+                "first_name": user.first_name,
+                "last_name": user.last_name,
             }
             for user in users
         ],

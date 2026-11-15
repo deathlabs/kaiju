@@ -3,6 +3,7 @@
 ## [0.1.0] - 2026-11-13
 ### Added
 - Added application record counts to backend version 0.1.0. The backend remains at version 0.1.0 from version 0.1.0.
+- Added objective creation and attachment during event creation and updates to backend version 0.1.0. The backend remains at version 0.1.0 from version 0.1.0.
 - Added objective and typed reference creation and attachment during exercise updates, validated both relationships, and included searchable exercise summaries and relationship usage counts in backend version 0.1.0. The backend remains at version 0.1.0 from version 0.1.0.
 - Added frontend version 0.1.0 as a new component with no previous version.
 - Added Deathlabs-prefixed layout, navigation with purpose-specific icons, classification, and theme components to frontend version 0.1.0. The frontend remains at version 0.1.0.
@@ -10,16 +11,19 @@
 - Added interactive objective cards with related exercise counts, modal-based management, and consistent exercise dropdown creation to frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 - Added related exercise identification to the edit objective modal in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 - Added interactive typed reference cards with related exercise counts and modal-based create, edit, and delete functions to frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
-- Added exercise search across titles, scenarios, authors, and related records, plus type, objective, and reference filters to frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
-- Added objective and reference search across their primary fields and related records to frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Added exercise search across titles, scenarios, authors, and related records, plus type, objective, and reference filters with All reset options to frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Added objective and reference search across their primary fields and related records, with reference type filters and an All reset option, to frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 - Added a current-user display and logout action to frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 - Added validated OIDC bearer authentication and signed local development tokens to backend version 0.1.0. The backend remains at version 0.1.0 from version 0.1.0.
 - Added an exercise workspace with overview, event, and inject management to frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Added objective creation from the event form to frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 
 ### Changed
+- Changed inject senders and recipients to roles and excluded the facilitator role in backend and frontend version 0.1.0. Both components remain at version 0.1.0 from version 0.1.0.
+- Renamed the standalone seed data module in backend version 0.1.0. The backend remains at version 0.1.0 from version 0.1.0.
 - Updated backend version 0.1.0 to delete injects and participants with their exercise. The backend remains at version 0.1.0 from version 0.1.0.
-- Updated exercise creation to select an application user as the facilitator in backend and frontend version 0.1.0. Both components remain at version 0.1.0 from version 0.1.0.
-- Updated the exercise Overview to show facilitators before other exercise information in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Updated exercise creation and editing to select an application user as the facilitator and show each facilitator name once in backend and frontend version 0.1.0. Both components remain at version 0.1.0 from version 0.1.0.
+- Updated the exercise Overview to group facilitators and participants, references and objectives, and schedule and scenario in three columns in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 - Organized the page modules in a dedicated `pages` directory in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 - Moved exercise objectives and references after the scenario field and standardized the Discussion and Hands-On label in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 - Updated the edit objective modal with clickable related exercises and read-only exercise information in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.

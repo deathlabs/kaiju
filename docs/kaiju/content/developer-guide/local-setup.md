@@ -37,7 +37,7 @@ Start the local development stack.
 make dev
 ```
 
-The target starts PostgreSQL in Docker and applies the current database migrations. It runs the backend and frontend from source.
+The target starts PostgreSQL in Docker and applies the current database migrations. It creates or updates the local development exercise and participants. Repeated runs do not create duplicate records. The target runs the backend and frontend from source.
 
 Open the frontend at `http://localhost:5173`. Open the backend at `http://localhost:8000`.
 

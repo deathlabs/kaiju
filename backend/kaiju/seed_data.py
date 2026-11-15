@@ -11,7 +11,6 @@ from uuid import UUID
 import django
 from django.db import transaction
 
-
 # Constants.
 PARTICIPANTS = (
     ("Ishiro", "Serizawa", "facilitator"),
@@ -124,12 +123,6 @@ def main() -> None:
         created_count, updated_count = seed_participants(args.exercise_id)
     except Exercise.DoesNotExist:
         raise SystemExit(f"Exercise {args.exercise_id} does not exist.") from None
-
-    print(
-        f"Seeded exercise {args.exercise_id}: "
-        f"created {created_count}, updated {updated_count}."
-    )
-
 
 if __name__ == "__main__":
     main()

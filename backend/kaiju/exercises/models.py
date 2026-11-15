@@ -137,6 +137,18 @@ class Inject(models.Model):
         EMAIL = "email"
         CHAT_MESSAGE = "chat_message"
 
+    class Role(models.TextChoices):
+        ISO = Participant.Role.ISO.value, Participant.Role.ISO.label
+        ISSM = Participant.Role.ISSM.value, Participant.Role.ISSM.label
+        ISSO = Participant.Role.ISSO.value, Participant.Role.ISSO.label
+        SYSTEM_ADMINISTRATOR = (
+            Participant.Role.SYSTEM_ADMINISTRATOR.value,
+            Participant.Role.SYSTEM_ADMINISTRATOR.label,
+        )
+        USER = Participant.Role.USER.value, Participant.Role.USER.label
+        CSSP = Participant.Role.CSSP.value, Participant.Role.CSSP.label
+        OPFOR = Participant.Role.OPFOR.value, Participant.Role.OPFOR.label
+
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -148,17 +160,13 @@ class Inject(models.Model):
         related_name="injects",
         on_delete=models.CASCADE,
     )
-    recipient = models.ForeignKey(
-        Participant,
-        related_name="injects_received",
-        on_delete=models.CASCADE,
-    )
     number = models.CharField(max_length=10)
     delivery_method = models.CharField(
         max_length=20,
         choices=DeliveryMethod.choices,
     )
-    sender = models.CharField(max_length=100)
+    sender = models.CharField(max_length=40, choices=Role.choices)
+    recipient = models.CharField(max_length=40, choices=Role.choices)
     message = models.TextField()
     expected_response = models.TextField(blank=True)
 

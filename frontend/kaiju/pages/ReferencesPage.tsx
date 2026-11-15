@@ -6,6 +6,7 @@ import Button from '@mui/material/Button'
 import Card from '@mui/material/Card'
 import CardActionArea from '@mui/material/CardActionArea'
 import CardContent from '@mui/material/CardContent'
+import Checkbox from '@mui/material/Checkbox'
 import Chip from '@mui/material/Chip'
 import CircularProgress from '@mui/material/CircularProgress'
 import Dialog from '@mui/material/Dialog'
@@ -17,6 +18,7 @@ import FormControl from '@mui/material/FormControl'
 import Grid from '@mui/material/Grid'
 import InputAdornment from '@mui/material/InputAdornment'
 import InputLabel from '@mui/material/InputLabel'
+import ListItemText from '@mui/material/ListItemText'
 import MenuItem from '@mui/material/MenuItem'
 import Paper from '@mui/material/Paper'
 import Select from '@mui/material/Select'
@@ -68,6 +70,7 @@ const getErrorMessage = async (response: Response) => {
 export function ReferencesPage() {
   const [references, setReferences] = useState<Reference[]>([])
   const [searchQuery, setSearchQuery] = useState('')
+  const [typeFilters, setTypeFilters] = useState<ReferenceType[]>([])
   const [loading, setLoading] = useState(true)
   const [pageError, setPageError] = useState<string | null>(null)
   const [formOpen, setFormOpen] = useState(false)
@@ -215,12 +218,19 @@ export function ReferencesPage() {
   }
 
   const normalizedSearchQuery = searchQuery.trim().toLocaleLowerCase()
-  const filteredReferences = references.filter((reference) =>
-    [typeLabels[reference.type], reference.title, reference.url]
-      .join(' ')
-      .toLocaleLowerCase()
-      .includes(normalizedSearchQuery),
+  const filteredReferences = references.filter(
+    (reference) =>
+      [typeLabels[reference.type], reference.title, reference.url]
+        .join(' ')
+        .toLocaleLowerCase()
+        .includes(normalizedSearchQuery) &&
+      (typeFilters.length === 0 || typeFilters.includes(reference.type)),
   )
+
+  const clearFilters = () => {
+    setSearchQuery('')
+    setTypeFilters([])
+  }
 
   return (
     <>
@@ -250,6 +260,44 @@ export function ReferencesPage() {
           sx={{ flexGrow: 1, minWidth: { sm: 240 } }}
           value={searchQuery}
         />
+        <FormControl size="small" sx={{ minWidth: 180 }}>
+          <InputLabel id="reference-type-filter-label" shrink>
+            Type
+          </InputLabel>
+          <Select
+            displayEmpty
+            label="Type"
+            labelId="reference-type-filter-label"
+            multiple
+            onChange={(event) => {
+              const value = event.target.value
+              const selectedTypes =
+                typeof value === 'string' ? value.split(',') : value
+              setTypeFilters(
+                selectedTypes.includes('all')
+                  ? []
+                  : (selectedTypes as ReferenceType[]),
+              )
+            }}
+            renderValue={(selectedTypes) =>
+              selectedTypes.length === 0
+                ? 'All'
+                : selectedTypes.map((type) => typeLabels[type]).join(', ')
+            }
+            value={typeFilters}
+          >
+            <MenuItem value="all">
+              <Checkbox checked={typeFilters.length === 0} />
+              <ListItemText primary="All" />
+            </MenuItem>
+            {(Object.keys(typeLabels) as ReferenceType[]).map((type) => (
+              <MenuItem key={type} value={type}>
+                <Checkbox checked={typeFilters.includes(type)} />
+                <ListItemText primary={typeLabels[type]} />
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
         <Button
           onClick={openCreateForm}
           startIcon={<AddIcon />}
@@ -289,10 +337,10 @@ export function ReferencesPage() {
       ) : filteredReferences.length === 0 ? (
         <Paper sx={{ p: 4, textAlign: 'center' }} variant="outlined">
           <Typography component="h2" gutterBottom variant="h6">
-            No references match your search
+            No references match your filters
           </Typography>
-          <Button color="inherit" onClick={() => setSearchQuery('')}>
-            Clear search
+          <Button color="inherit" onClick={clearFilters}>
+            Clear filters
           </Button>
         </Paper>
       ) : (

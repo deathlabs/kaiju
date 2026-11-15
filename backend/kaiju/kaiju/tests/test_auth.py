@@ -135,10 +135,14 @@ class AuthenticationTests(TestCase):
                 {
                     "username": "mothra",
                     "display_name": "Mosura",
+                    "first_name": "Mosura",
+                    "last_name": "",
                 },
                 {
                     "username": "Vic Fernandez III",
                     "display_name": "Vic Fernandez III",
+                    "first_name": "Vic",
+                    "last_name": "Fernandez III",
                 },
             ],
         )
@@ -365,6 +369,33 @@ class AuthenticationTests(TestCase):
             update_response.json()["updated_by"]["username"],
             "Grace Hopper",
         )
+
+    def test_exercise_update_changes_facilitator(self):
+        create_response = self._create_exercise()
+        exercise_id = create_response.json()["id"]
+        get_user_model().objects.create_user(
+            username="Grace Hopper",
+            first_name="Grace",
+            last_name="Hopper",
+            email="grace@example.com",
+        )
+
+        with self._settings():
+            response = self.client.patch(
+                f"/api/v1/exercises/{exercise_id}/",
+                data=json.dumps({"facilitator_username": "Grace Hopper"}),
+                content_type="application/json",
+                **self._authorization(self._token()),
+            )
+
+        self.assertEqual(response.status_code, 200)
+        facilitator = Participant.objects.get(
+            exercise_id=exercise_id,
+            role=Participant.Role.FACILITATOR,
+        )
+        self.assertEqual(facilitator.first_name, "Grace")
+        self.assertEqual(facilitator.last_name, "Hopper")
+        self.assertEqual(facilitator.email, "grace@example.com")
 
     def test_exercise_creation_attaches_objectives(self):
         objective = Objective.objects.create(
@@ -661,6 +692,37 @@ class AuthenticationTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(Event.objects.count(), 0)
 
+    def test_event_creation_creates_and_attaches_new_objectives(self):
+        create_response = self._create_exercise()
+        exercise_id = create_response.json()["id"]
+
+        with self._settings():
+            response = self.client.post(
+                f"/api/v1/exercises/{exercise_id}/events/",
+                data=json.dumps(
+                    {
+                        "number": 1,
+                        "description": "Investigate the alert.",
+                        "new_objectives": [
+                            {
+                                "title": "Validate escalation",
+                                "description": "Validate the escalation process.",
+                            }
+                        ],
+                        "objective_ids": [],
+                    }
+                ),
+                content_type="application/json",
+                **self._authorization(self._token()),
+            )
+
+        self.assertEqual(response.status_code, 201)
+        objective = Objective.objects.get(title="Validate escalation")
+        self.assertEqual(Event.objects.get().objectives.get(), objective)
+        self.assertEqual(
+            Exercise.objects.get(id=exercise_id).objectives.get(), objective
+        )
+
     def test_event_update_rejects_objectives_outside_exercise(self):
         exercise_objective = Objective.objects.create(
             title="Validate escalation",
@@ -704,44 +766,73 @@ class AuthenticationTests(TestCase):
         self.assertEqual(event.description, "Investigate the alert.")
         self.assertEqual(event.objectives.get(), exercise_objective)
 
-    def test_inject_update_rejects_recipient_outside_exercise(self):
-        first_exercise_id = self._create_exercise().json()["id"]
-        second_exercise_id = self._create_exercise().json()["id"]
-        first_participant = Participant.objects.get(exercise_id=first_exercise_id)
-        second_participant = Participant.objects.get(exercise_id=second_exercise_id)
+    def test_inject_update_uses_role_endpoints(self):
+        exercise_id = self._create_exercise().json()["id"]
         event = Event.objects.create(
-            exercise_id=first_exercise_id,
+            exercise_id=exercise_id,
             number=1,
             description="Investigate the alert.",
         )
         inject = Inject.objects.create(
             event=event,
-            recipient=first_participant,
+            recipient=Inject.Role.ISSO,
             number="1A",
             scheduled_start_time="2026-11-16T13:05:00Z",
             delivery_method=Inject.DeliveryMethod.EMAIL,
-            sender="CSSP",
+            sender=Inject.Role.CSSP,
             message="Investigate the traffic.",
         )
 
         with self._settings():
             response = self.client.patch(
                 (
-                    f"/api/v1/exercises/{first_exercise_id}/events/{event.id}/"
+                    f"/api/v1/exercises/{exercise_id}/events/{event.id}/"
                     f"injects/{inject.id}/"
                 ),
-                data=json.dumps({"recipient_id": str(second_participant.id)}),
+                data=json.dumps(
+                    {
+                        "sender": Inject.Role.ISSO,
+                        "recipient": Inject.Role.ISSM,
+                    }
+                ),
                 content_type="application/json",
                 **self._authorization(self._token()),
             )
 
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.status_code, 200)
         inject.refresh_from_db()
-        self.assertEqual(inject.recipient, first_participant)
+        self.assertEqual(inject.sender, Inject.Role.ISSO)
+        self.assertEqual(inject.recipient, Inject.Role.ISSM)
+
+    def test_inject_rejects_facilitator_endpoint(self):
+        exercise_id = self._create_exercise().json()["id"]
+        event = Event.objects.create(
+            exercise_id=exercise_id,
+            number=1,
+            description="Investigate the alert.",
+        )
+
+        with self._settings():
+            response = self.client.post(
+                f"/api/v1/exercises/{exercise_id}/events/{event.id}/injects/",
+                data=json.dumps(
+                    {
+                        "number": "1A",
+                        "scheduled_start_time": "2026-11-16T13:05:00Z",
+                        "delivery_method": Inject.DeliveryMethod.EMAIL,
+                        "sender": Participant.Role.FACILITATOR,
+                        "recipient": Inject.Role.ISSO,
+                        "message": "Investigate the traffic.",
+                    }
+                ),
+                content_type="application/json",
+                **self._authorization(self._token()),
+            )
+
+        self.assertEqual(response.status_code, 422)
 
     def test_exercise_delete_removes_injects_and_participants(self):
         exercise_id = self._create_exercise().json()["id"]
-        participant = Participant.objects.get(exercise_id=exercise_id)
         event = Event.objects.create(
             exercise_id=exercise_id,
             number=1,
@@ -749,11 +840,11 @@ class AuthenticationTests(TestCase):
         )
         Inject.objects.create(
             event=event,
-            recipient=participant,
+            recipient=Inject.Role.ISSO,
             number="1A",
             scheduled_start_time="2026-11-16T13:05:00Z",
             delivery_method=Inject.DeliveryMethod.EMAIL,
-            sender="CSSP",
+            sender=Inject.Role.CSSP,
             message="Investigate the traffic.",
         )
 

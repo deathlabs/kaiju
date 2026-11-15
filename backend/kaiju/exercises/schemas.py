@@ -87,8 +87,8 @@ class InjectSchema(Schema):
     ended_at: datetime | None
     number: str
     delivery_method: Inject.DeliveryMethod
-    sender: str
-    recipient: ParticipantSchema
+    sender: Inject.Role
+    recipient: Inject.Role
     message: str
     expected_response: str
     responses: list[ResponseSchema]
@@ -97,11 +97,11 @@ class InjectSchema(Schema):
 class InjectCreateSchema(Schema):
     """The fields required to create an Inject."""
 
-    recipient_id: UUID
+    recipient: Inject.Role
     number: str
     scheduled_start_time: datetime
     delivery_method: Inject.DeliveryMethod
-    sender: str
+    sender: Inject.Role
     message: str
     expected_response: str = ""
 
@@ -109,13 +109,13 @@ class InjectCreateSchema(Schema):
 class InjectUpdateSchema(Schema):
     """The fields that can be updated on an Inject."""
 
-    recipient_id: UUID | None = None
+    recipient: Inject.Role | None = None
     number: str | None = None
     scheduled_start_time: datetime | None = None
     started_at: datetime | None = None
     ended_at: datetime | None = None
     delivery_method: Inject.DeliveryMethod | None = None
-    sender: str | None = None
+    sender: Inject.Role | None = None
     message: str | None = None
     expected_response: str | None = None
 
@@ -139,6 +139,7 @@ class EventCreateSchema(Schema):
 
     number: int
     description: str
+    new_objectives: list[ObjectiveCreateSchema] = Field(default_factory=list)
     objective_ids: list[UUID]
 
 
@@ -147,6 +148,7 @@ class EventUpdateSchema(Schema):
 
     number: int | None = None
     description: str | None = None
+    new_objectives: list[ObjectiveCreateSchema] | None = None
     objective_ids: list[UUID] | None = None
     started_at: datetime | None = None
     ended_at: datetime | None = None
@@ -246,6 +248,7 @@ class ExerciseUpdateSchema(Schema):
     new_references: list[ReferenceCreateSchema] | None = None
     reference_ids: list[UUID] | None = None
     objective_ids: list[UUID] | None = None
+    facilitator_username: str | None = None
     type: Exercise.Type | None = None
     scheduled_start_time: datetime | None = None
     scheduled_end_time: datetime | None = None

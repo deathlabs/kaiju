@@ -32,9 +32,16 @@ import Typography from '@mui/material/Typography'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 
 type DeliveryMethod = 'index_card' | 'phone_call' | 'email' | 'chat_message'
+type InjectRole = 'information_system_owner' | 'information_system_security_manager' | 'information_system_security_officer' | 'system_administrator' | 'user' | 'cybersecurity_service_provider' | 'opposing_force'
 
 interface Objective {
   id: string
+  title: string
+  description: string
+}
+
+interface NewObjective {
+  clientId: string
   title: string
   description: string
 }
@@ -52,8 +59,8 @@ interface Inject {
   number: string
   scheduled_start_time: string
   delivery_method: DeliveryMethod
-  sender: string
-  recipient: Participant
+  sender: InjectRole
+  recipient: InjectRole
   message: string
   expected_response: string
 }
@@ -73,6 +80,7 @@ export interface ExerciseDetail {
   scheduled_start_time: string
   scheduled_end_time: string
   objectives: Objective[]
+  references: { id: string; title: string }[]
   participants: Participant[]
   events: ExerciseEvent[]
 }
@@ -86,6 +94,7 @@ interface ExerciseWorkspaceProps {
 interface EventForm {
   number: string
   description: string
+  newObjectives: NewObjective[]
   objectiveIds: string[]
 }
 
@@ -93,8 +102,8 @@ interface InjectForm {
   number: string
   scheduledStartTime: string
   deliveryMethod: DeliveryMethod
-  sender: string
-  recipientId: string
+  sender: InjectRole
+  recipient: InjectRole
   message: string
   expectedResponse: string
 }
@@ -105,6 +114,19 @@ const deliveryMethodLabels: Record<DeliveryMethod, string> = {
   email: 'Email',
   chat_message: 'Chat message',
 }
+
+const injectRoleLabels: Record<InjectRole, string> = {
+  information_system_owner: 'Information System Owner',
+  information_system_security_manager: 'Information System Security Manager',
+  information_system_security_officer: 'Information System Security Officer',
+  system_administrator: 'System Administrator',
+  user: 'User',
+  cybersecurity_service_provider: 'Cybersecurity Service Provider',
+  opposing_force: 'Opposing Force',
+}
+
+const createObjectiveValue = 'create-objective'
+const newObjectiveValuePrefix = 'new-objective:'
 
 const formatDateTimeLocal = (value: string) => {
   const date = new Date(value)
@@ -133,12 +155,15 @@ export function ExerciseWorkspace({ exerciseId, onClose, onEdit }: ExerciseWorks
   const [tab, setTab] = useState(0)
   const [eventFormOpen, setEventFormOpen] = useState(false)
   const [editingEvent, setEditingEvent] = useState<ExerciseEvent | null>(null)
-  const [eventForm, setEventForm] = useState<EventForm>({ number: '', description: '', objectiveIds: [] })
+  const [eventForm, setEventForm] = useState<EventForm>({ number: '', description: '', newObjectives: [], objectiveIds: [] })
+  const [newObjectiveDialogOpen, setNewObjectiveDialogOpen] = useState(false)
+  const [newObjectiveDraft, setNewObjectiveDraft] = useState({ title: '', description: '' })
+  const [newObjectiveError, setNewObjectiveError] = useState<string | null>(null)
   const [injectFormOpen, setInjectFormOpen] = useState(false)
   const [injectEvent, setInjectEvent] = useState<ExerciseEvent | null>(null)
   const [editingInject, setEditingInject] = useState<Inject | null>(null)
   const [injectForm, setInjectForm] = useState<InjectForm>({
-    number: '', scheduledStartTime: '', deliveryMethod: 'email', sender: '', recipientId: '', message: '', expectedResponse: '',
+    number: '', scheduledStartTime: '', deliveryMethod: 'email', sender: 'cybersecurity_service_provider', recipient: 'information_system_security_officer', message: '', expectedResponse: '',
   })
   const [formError, setFormError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -172,10 +197,36 @@ export function ExerciseWorkspace({ exerciseId, onClose, onEdit }: ExerciseWorks
     setEventForm({
       number: String(event?.number ?? ((exercise?.events.length ?? 0) + 1)),
       description: event?.description ?? '',
+      newObjectives: [],
       objectiveIds: event?.objectives.map((objective) => objective.id) ?? [],
     })
     setFormError(null)
     setEventFormOpen(true)
+  }
+
+  const openNewObjectiveDialog = () => {
+    setNewObjectiveDraft({ title: '', description: '' })
+    setNewObjectiveError(null)
+    setNewObjectiveDialogOpen(true)
+  }
+
+  const addNewObjective = () => {
+    const title = newObjectiveDraft.title.trim()
+    const description = newObjectiveDraft.description.trim()
+
+    if (!title || !description) {
+      setNewObjectiveError('Enter a title and description.')
+      return
+    }
+
+    setEventForm((currentForm) => ({
+      ...currentForm,
+      newObjectives: [
+        ...currentForm.newObjectives,
+        { clientId: crypto.randomUUID(), title, description },
+      ],
+    }))
+    setNewObjectiveDialogOpen(false)
   }
 
   const saveEvent = async (submitEvent: FormEvent) => {
@@ -193,6 +244,10 @@ export function ExerciseWorkspace({ exerciseId, onClose, onEdit }: ExerciseWorks
         body: JSON.stringify({
           number: Number(eventForm.number),
           description: eventForm.description.trim(),
+          new_objectives: eventForm.newObjectives.map((objective) => ({
+            title: objective.title,
+            description: objective.description,
+          })),
           objective_ids: eventForm.objectiveIds,
         }),
       })
@@ -220,8 +275,8 @@ export function ExerciseWorkspace({ exerciseId, onClose, onEdit }: ExerciseWorks
       number: inject?.number ?? `${event.number}${String.fromCharCode(65 + event.injects.length)}`,
       scheduledStartTime: formatDateTimeLocal(inject?.scheduled_start_time ?? exercise?.scheduled_start_time ?? new Date().toISOString()),
       deliveryMethod: inject?.delivery_method ?? 'email',
-      sender: inject?.sender ?? '',
-      recipientId: inject?.recipient.id ?? exercise?.participants[0]?.id ?? '',
+      sender: inject?.sender ?? 'cybersecurity_service_provider',
+      recipient: inject?.recipient ?? 'information_system_security_officer',
       message: inject?.message ?? '',
       expectedResponse: inject?.expected_response ?? '',
     })
@@ -246,7 +301,7 @@ export function ExerciseWorkspace({ exerciseId, onClose, onEdit }: ExerciseWorks
           scheduled_start_time: new Date(injectForm.scheduledStartTime).toISOString(),
           delivery_method: injectForm.deliveryMethod,
           sender: injectForm.sender.trim(),
-          recipient_id: injectForm.recipientId,
+          recipient: injectForm.recipient,
           message: injectForm.message.trim(),
           expected_response: injectForm.expectedResponse.trim(),
         }),
@@ -284,13 +339,20 @@ export function ExerciseWorkspace({ exerciseId, onClose, onEdit }: ExerciseWorks
                 <Tab label="Master Scenario Event List" />
               </Tabs>
               {tab === 0 && (
-                <Stack spacing={3} sx={{ pt: 3 }}>
-                  <Box><Typography color="text.secondary" variant="overline">Facilitator</Typography><Typography>{exercise.participants.filter((participant) => participant.role === 'facilitator').map(participantName).join(', ') || 'No facilitator'}</Typography></Box>
-                  <Box><Typography color="text.secondary" variant="overline">Scenario</Typography><Typography>{exercise.scenario}</Typography></Box>
-                  <Box><Typography color="text.secondary" variant="overline">Schedule</Typography><Typography>{new Date(exercise.scheduled_start_time).toLocaleString()} – {new Date(exercise.scheduled_end_time).toLocaleString()}</Typography></Box>
-                  <Box><Typography color="text.secondary" variant="overline">Objectives</Typography><Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap', mt: 1 }}>{exercise.objectives.map((objective) => <Chip key={objective.id} label={objective.title} />)}</Stack></Box>
-                  <Box><Typography color="text.secondary" variant="overline">Participants</Typography><Typography>{exercise.participants.map(participantName).join(', ') || 'No participants'}</Typography></Box>
-                </Stack>
+                <Box sx={{ display: 'grid', gap: 3, gridTemplateColumns: { xs: '1fr', md: 'repeat(3, minmax(0, 1fr))' }, pt: 3 }}>
+                  <Stack spacing={3}>
+                    <Box><Typography color="text.secondary" variant="overline">Facilitator</Typography><Typography>{exercise.participants.filter((participant) => participant.role === 'facilitator').map(participantName).join(', ') || 'No facilitator'}</Typography></Box>
+                    <Box><Typography color="text.secondary" variant="overline">Participants</Typography><Typography>{exercise.participants.map(participantName).join(', ') || 'No participants'}</Typography></Box>
+                  </Stack>
+                  <Stack spacing={3}>
+                    <Box><Typography color="text.secondary" variant="overline">References</Typography><Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap', mt: 1 }}>{exercise.references.map((reference) => <Chip key={reference.id} label={reference.title} />)}</Stack></Box>
+                    <Box><Typography color="text.secondary" variant="overline">Objectives</Typography><Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap', mt: 1 }}>{exercise.objectives.map((objective) => <Chip key={objective.id} label={objective.title} />)}</Stack></Box>
+                  </Stack>
+                  <Stack spacing={3}>
+                    <Box><Typography color="text.secondary" variant="overline">Schedule</Typography><Typography>{new Date(exercise.scheduled_start_time).toLocaleString()} – {new Date(exercise.scheduled_end_time).toLocaleString()}</Typography></Box>
+                    <Box><Typography color="text.secondary" variant="overline">Scenario</Typography><Typography>{exercise.scenario}</Typography></Box>
+                  </Stack>
+                </Box>
               )}
               {tab === 1 && (
                 <Stack spacing={2} sx={{ pt: 3 }}>
@@ -308,7 +370,7 @@ export function ExerciseWorkspace({ exerciseId, onClose, onEdit }: ExerciseWorks
                         <Table size="small">
                           <TableHead><TableRow><TableCell>Inject</TableCell><TableCell>Scheduled</TableCell><TableCell>Method</TableCell><TableCell>From</TableCell><TableCell>To</TableCell><TableCell>Message</TableCell><TableCell /></TableRow></TableHead>
                           <TableBody>
-                            {event.injects.map((inject) => <TableRow key={inject.id}><TableCell>{inject.number}</TableCell><TableCell>{new Date(inject.scheduled_start_time).toLocaleString()}</TableCell><TableCell>{deliveryMethodLabels[inject.delivery_method]}</TableCell><TableCell>{inject.sender}</TableCell><TableCell>{participantName(inject.recipient)}</TableCell><TableCell sx={{ maxWidth: 360 }}>{inject.message}</TableCell><TableCell><IconButton aria-label={`Edit inject ${inject.number}`} onClick={() => openInjectForm(event, inject)}><EditIcon /></IconButton><IconButton aria-label={`Delete inject ${inject.number}`} color="error" onClick={() => void deleteInject(event, inject)}><DeleteIcon /></IconButton></TableCell></TableRow>)}
+                            {event.injects.map((inject) => <TableRow key={inject.id}><TableCell>{inject.number}</TableCell><TableCell>{new Date(inject.scheduled_start_time).toLocaleString()}</TableCell><TableCell>{deliveryMethodLabels[inject.delivery_method]}</TableCell><TableCell>{injectRoleLabels[inject.sender]}</TableCell><TableCell>{injectRoleLabels[inject.recipient]}</TableCell><TableCell sx={{ maxWidth: 360 }}>{inject.message}</TableCell><TableCell><IconButton aria-label={`Edit inject ${inject.number}`} onClick={() => openInjectForm(event, inject)}><EditIcon /></IconButton><IconButton aria-label={`Delete inject ${inject.number}`} color="error" onClick={() => void deleteInject(event, inject)}><DeleteIcon /></IconButton></TableCell></TableRow>)}
                             {event.injects.length === 0 && <TableRow><TableCell colSpan={7}>No injects have been added.</TableCell></TableRow>}
                           </TableBody>
                         </Table>
@@ -324,11 +386,46 @@ export function ExerciseWorkspace({ exerciseId, onClose, onEdit }: ExerciseWorks
       </Dialog>
 
       <Dialog fullWidth maxWidth="sm" onClose={() => setEventFormOpen(false)} open={eventFormOpen}>
-        <Box component="form" onSubmit={saveEvent}><DialogTitle>{editingEvent ? 'Edit event' : 'Add event'}</DialogTitle><DialogContent><Stack spacing={2} sx={{ pt: 1 }}>{formError && <Alert severity="error">{formError}</Alert>}<TextField label="Event number" onChange={(event) => setEventForm((form) => ({ ...form, number: event.target.value }))} required type="number" value={eventForm.number} /><TextField label="Description" onChange={(event) => setEventForm((form) => ({ ...form, description: event.target.value }))} required value={eventForm.description} /><FormControl><InputLabel id="event-objectives-label">Objectives</InputLabel><Select label="Objectives" labelId="event-objectives-label" multiple onChange={(event) => setEventForm((form) => ({ ...form, objectiveIds: typeof event.target.value === 'string' ? event.target.value.split(',') : event.target.value }))} renderValue={(ids) => ids.map((id) => exercise?.objectives.find((objective) => objective.id === id)?.title).filter(Boolean).join(', ')} value={eventForm.objectiveIds}>{exercise?.objectives.map((objective) => <MenuItem key={objective.id} value={objective.id}><Checkbox checked={eventForm.objectiveIds.includes(objective.id)} /><ListItemText primary={objective.title} secondary={objective.description} /></MenuItem>)}</Select></FormControl></Stack></DialogContent><DialogActions><Button disabled={saving} type="submit" variant="contained">{saving ? 'Saving…' : 'Save'}</Button><Button onClick={() => setEventFormOpen(false)}>Cancel</Button></DialogActions></Box>
+        <Box component="form" onSubmit={saveEvent}><DialogTitle>{editingEvent ? 'Edit event' : 'Add event'}</DialogTitle><DialogContent><Stack spacing={2} sx={{ pt: 1 }}>{formError && <Alert severity="error">{formError}</Alert>}<TextField label="Event number" onChange={(event) => setEventForm((form) => ({ ...form, number: event.target.value }))} required type="number" value={eventForm.number} /><TextField label="Description" onChange={(event) => setEventForm((form) => ({ ...form, description: event.target.value }))} required value={eventForm.description} /><FormControl><InputLabel id="event-objectives-label">Objectives</InputLabel><Select label="Objectives" labelId="event-objectives-label" multiple onChange={(event) => {
+          const value = event.target.value
+          const selectedValues = typeof value === 'string' ? value.split(',') : value
+          if (selectedValues.includes(createObjectiveValue)) {
+            openNewObjectiveDialog()
+            return
+          }
+          setEventForm((currentForm) => ({
+            ...currentForm,
+            newObjectives: currentForm.newObjectives.filter((objective) => selectedValues.includes(`${newObjectiveValuePrefix}${objective.clientId}`)),
+            objectiveIds: selectedValues.filter((selectedValue) => !selectedValue.startsWith(newObjectiveValuePrefix)),
+          }))
+        }} renderValue={(ids) => ids.map((id) => {
+          if (id.startsWith(newObjectiveValuePrefix)) {
+            const clientId = id.slice(newObjectiveValuePrefix.length)
+            return eventForm.newObjectives.find((objective) => objective.clientId === clientId)?.title
+          }
+          return exercise?.objectives.find((objective) => objective.id === id)?.title
+        }).filter(Boolean).join(', ')} value={[...eventForm.objectiveIds, ...eventForm.newObjectives.map((objective) => `${newObjectiveValuePrefix}${objective.clientId}`)]}>
+          <MenuItem value={createObjectiveValue}><AddIcon fontSize="small" sx={{ mr: 1 }} />Create objective</MenuItem>
+          {exercise?.objectives.map((objective) => <MenuItem key={objective.id} value={objective.id}><Checkbox checked={eventForm.objectiveIds.includes(objective.id)} /><ListItemText primary={objective.title} secondary={objective.description} /></MenuItem>)}
+          {eventForm.newObjectives.map((objective) => <MenuItem key={objective.clientId} value={`${newObjectiveValuePrefix}${objective.clientId}`}><Checkbox checked /><ListItemText primary={objective.title} secondary={`${objective.description} (new)`} /></MenuItem>)}
+        </Select></FormControl></Stack></DialogContent><DialogActions><Button disabled={saving} type="submit" variant="contained">{saving ? 'Saving…' : 'Save'}</Button><Button onClick={() => setEventFormOpen(false)}>Cancel</Button></DialogActions></Box>
+      </Dialog>
+
+      <Dialog fullWidth maxWidth="sm" onClose={() => setNewObjectiveDialogOpen(false)} open={newObjectiveDialogOpen}>
+        <DialogTitle>Add objective</DialogTitle>
+        <DialogContent>
+          {newObjectiveError && <Alert severity="error" sx={{ mb: 2 }}>{newObjectiveError}</Alert>}
+          <TextField autoFocus fullWidth label="Title" margin="dense" onChange={(event) => setNewObjectiveDraft((draft) => ({ ...draft, title: event.target.value }))} required value={newObjectiveDraft.title} />
+          <TextField fullWidth label="Description" margin="dense" minRows={4} multiline onChange={(event) => setNewObjectiveDraft((draft) => ({ ...draft, description: event.target.value }))} required value={newObjectiveDraft.description} />
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: 'flex-start' }}>
+          <Button onClick={addNewObjective} variant="contained">Save</Button>
+          <Button color="inherit" onClick={() => setNewObjectiveDialogOpen(false)}>Cancel</Button>
+        </DialogActions>
       </Dialog>
 
       <Dialog fullWidth maxWidth="md" onClose={() => setInjectFormOpen(false)} open={injectFormOpen}>
-        <Box component="form" onSubmit={saveInject}><DialogTitle>{editingInject ? 'Edit inject' : 'Add inject'}</DialogTitle><DialogContent><Stack spacing={2} sx={{ pt: 1 }}>{formError && <Alert severity="error">{formError}</Alert>}<Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}><TextField fullWidth label="Inject number" onChange={(event) => setInjectForm((form) => ({ ...form, number: event.target.value }))} required value={injectForm.number} /><TextField fullWidth label="Scheduled start" onChange={(event) => setInjectForm((form) => ({ ...form, scheduledStartTime: event.target.value }))} required slotProps={{ inputLabel: { shrink: true } }} type="datetime-local" value={injectForm.scheduledStartTime} /></Stack><FormControl><InputLabel id="delivery-method-label">Delivery method</InputLabel><Select label="Delivery method" labelId="delivery-method-label" onChange={(event) => setInjectForm((form) => ({ ...form, deliveryMethod: event.target.value as DeliveryMethod }))} value={injectForm.deliveryMethod}>{(Object.keys(deliveryMethodLabels) as DeliveryMethod[]).map((method) => <MenuItem key={method} value={method}>{deliveryMethodLabels[method]}</MenuItem>)}</Select></FormControl><TextField label="From" onChange={(event) => setInjectForm((form) => ({ ...form, sender: event.target.value }))} required value={injectForm.sender} /><FormControl required><InputLabel id="recipient-label">To</InputLabel><Select label="To" labelId="recipient-label" onChange={(event) => setInjectForm((form) => ({ ...form, recipientId: event.target.value }))} value={injectForm.recipientId}>{exercise?.participants.map((participant) => <MenuItem key={participant.id} value={participant.id}>{participantName(participant)}</MenuItem>)}</Select></FormControl><TextField label="Message" minRows={4} multiline onChange={(event) => setInjectForm((form) => ({ ...form, message: event.target.value }))} required value={injectForm.message} /><TextField label="Expected response" minRows={3} multiline onChange={(event) => setInjectForm((form) => ({ ...form, expectedResponse: event.target.value }))} value={injectForm.expectedResponse} /></Stack></DialogContent><DialogActions><Button disabled={saving} type="submit" variant="contained">{saving ? 'Saving…' : 'Save'}</Button><Button onClick={() => setInjectFormOpen(false)}>Cancel</Button></DialogActions></Box>
+        <Box component="form" onSubmit={saveInject}><DialogTitle>{editingInject ? 'Edit inject' : 'Add inject'}</DialogTitle><DialogContent><Stack spacing={2} sx={{ pt: 1 }}>{formError && <Alert severity="error">{formError}</Alert>}<Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}><TextField fullWidth label="Inject number" onChange={(event) => setInjectForm((form) => ({ ...form, number: event.target.value }))} required value={injectForm.number} /><TextField fullWidth label="Scheduled start" onChange={(event) => setInjectForm((form) => ({ ...form, scheduledStartTime: event.target.value }))} required slotProps={{ inputLabel: { shrink: true } }} type="datetime-local" value={injectForm.scheduledStartTime} /></Stack><FormControl><InputLabel id="delivery-method-label">Delivery method</InputLabel><Select label="Delivery method" labelId="delivery-method-label" onChange={(event) => setInjectForm((form) => ({ ...form, deliveryMethod: event.target.value as DeliveryMethod }))} value={injectForm.deliveryMethod}>{(Object.keys(deliveryMethodLabels) as DeliveryMethod[]).map((method) => <MenuItem key={method} value={method}>{deliveryMethodLabels[method]}</MenuItem>)}</Select></FormControl><FormControl required><InputLabel id="sender-label">From</InputLabel><Select label="From" labelId="sender-label" onChange={(event) => setInjectForm((form) => ({ ...form, sender: event.target.value as InjectRole }))} value={injectForm.sender}>{(Object.keys(injectRoleLabels) as InjectRole[]).map((role) => <MenuItem key={role} value={role}>{injectRoleLabels[role]}</MenuItem>)}</Select></FormControl><FormControl required><InputLabel id="recipient-label">To</InputLabel><Select label="To" labelId="recipient-label" onChange={(event) => setInjectForm((form) => ({ ...form, recipient: event.target.value as InjectRole }))} value={injectForm.recipient}>{(Object.keys(injectRoleLabels) as InjectRole[]).map((role) => <MenuItem key={role} value={role}>{injectRoleLabels[role]}</MenuItem>)}</Select></FormControl><TextField label="Message" minRows={4} multiline onChange={(event) => setInjectForm((form) => ({ ...form, message: event.target.value }))} required value={injectForm.message} /><TextField label="Expected response" minRows={3} multiline onChange={(event) => setInjectForm((form) => ({ ...form, expectedResponse: event.target.value }))} value={injectForm.expectedResponse} /></Stack></DialogContent><DialogActions><Button disabled={saving} type="submit" variant="contained">{saving ? 'Saving…' : 'Save'}</Button><Button onClick={() => setInjectFormOpen(false)}>Cancel</Button></DialogActions></Box>
       </Dialog>
     </>
   )

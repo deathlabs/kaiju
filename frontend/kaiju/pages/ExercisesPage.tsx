@@ -44,6 +44,14 @@ interface ExerciseUser {
 interface SelectableUser {
   username: string
   display_name: string
+  first_name: string
+  last_name: string
+}
+
+interface ExerciseParticipant {
+  first_name: string
+  last_name: string
+  role: string
 }
 
 interface ExerciseSummary {
@@ -58,6 +66,7 @@ interface ExerciseSummary {
   type: ExerciseType
   title: string
   status: ExerciseStatus
+  participants?: ExerciseParticipant[]
 }
 
 interface Objective {
@@ -303,9 +312,17 @@ export function ExercisesPage() {
       if (!response.ok) throw new Error(await getErrorMessage(response))
 
       const exerciseDetails = (await response.json()) as ExerciseSummary
+      const facilitator = exerciseDetails.participants?.find(
+        (participant) => participant.role === 'facilitator',
+      )
+      const facilitatorUser = users.find(
+        (user) =>
+          user.first_name === facilitator?.first_name &&
+          user.last_name === facilitator?.last_name,
+      )
       setEditingExercise(exerciseDetails)
       setForm({
-        facilitatorUsername: '',
+        facilitatorUsername: facilitatorUser?.username ?? '',
         newObjectives: [],
         newReferences: [],
         objectiveIds: exerciseDetails.objectives.map(
@@ -483,9 +500,7 @@ export function ExercisesPage() {
           })),
           objective_ids: form.objectiveIds,
           reference_ids: form.referenceIds,
-          ...(!editingExercise && {
-            facilitator_username: form.facilitatorUsername,
-          }),
+          facilitator_username: form.facilitatorUsername,
           title: form.title.trim() || defaultTitle,
           type: form.type,
           scheduled_start_time: new Date(form.scheduledStartTime).toISOString(),
@@ -608,24 +623,35 @@ export function ExercisesPage() {
           value={searchQuery}
         />
         <FormControl size="small" sx={{ minWidth: 180 }}>
-          <InputLabel id="type-filter-label">Type</InputLabel>
+          <InputLabel id="type-filter-label" shrink>
+            Type
+          </InputLabel>
           <Select
+            displayEmpty
             label="Type"
             labelId="type-filter-label"
             multiple
             onChange={(event) => {
               const value = event.target.value
+              const selectedTypes =
+                typeof value === 'string' ? value.split(',') : value
               setTypeFilters(
-                (typeof value === 'string'
-                  ? value.split(',')
-                  : value) as ExerciseType[],
+                selectedTypes.includes('all')
+                  ? []
+                  : (selectedTypes as ExerciseType[]),
               )
             }}
             renderValue={(selectedTypes) =>
-              selectedTypes.map((type) => typeLabels[type]).join(', ')
+              selectedTypes.length === 0
+                ? 'All'
+                : selectedTypes.map((type) => typeLabels[type]).join(', ')
             }
             value={typeFilters}
           >
+            <MenuItem value="all">
+              <Checkbox checked={typeFilters.length === 0} />
+              <ListItemText primary="All" />
+            </MenuItem>
             {(Object.keys(typeLabels) as ExerciseType[]).map((type) => (
               <MenuItem key={type} value={type}>
                 <Checkbox checked={typeFilters.includes(type)} />
@@ -635,29 +661,41 @@ export function ExercisesPage() {
           </Select>
         </FormControl>
         <FormControl size="small" sx={{ minWidth: 180 }}>
-          <InputLabel id="objective-filter-label">Objective</InputLabel>
+          <InputLabel id="objective-filter-label" shrink>
+            Objective
+          </InputLabel>
           <Select
+            displayEmpty
             label="Objective"
             labelId="objective-filter-label"
             multiple
             onChange={(event) => {
               const value = event.target.value
+              const selectedIds =
+                typeof value === 'string' ? value.split(',') : value
               setObjectiveFilterIds(
-                typeof value === 'string' ? value.split(',') : value,
+                selectedIds.includes('all') ? [] : selectedIds,
               )
             }}
             renderValue={(selectedIds) =>
-              selectedIds
-                .map(
-                  (selectedId) =>
-                    objectives.find((objective) => objective.id === selectedId)
-                      ?.title,
-                )
-                .filter(Boolean)
-                .join(', ')
+              selectedIds.length === 0
+                ? 'All'
+                : selectedIds
+                    .map(
+                      (selectedId) =>
+                        objectives.find(
+                          (objective) => objective.id === selectedId,
+                        )?.title,
+                    )
+                    .filter(Boolean)
+                    .join(', ')
             }
             value={objectiveFilterIds}
           >
+            <MenuItem value="all">
+              <Checkbox checked={objectiveFilterIds.length === 0} />
+              <ListItemText primary="All" />
+            </MenuItem>
             {objectives.map((objective) => (
               <MenuItem key={objective.id} value={objective.id}>
                 <Checkbox checked={objectiveFilterIds.includes(objective.id)} />
@@ -667,29 +705,41 @@ export function ExercisesPage() {
           </Select>
         </FormControl>
         <FormControl size="small" sx={{ minWidth: 180 }}>
-          <InputLabel id="reference-filter-label">Reference</InputLabel>
+          <InputLabel id="reference-filter-label" shrink>
+            Reference
+          </InputLabel>
           <Select
+            displayEmpty
             label="Reference"
             labelId="reference-filter-label"
             multiple
             onChange={(event) => {
               const value = event.target.value
+              const selectedIds =
+                typeof value === 'string' ? value.split(',') : value
               setReferenceFilterIds(
-                typeof value === 'string' ? value.split(',') : value,
+                selectedIds.includes('all') ? [] : selectedIds,
               )
             }}
             renderValue={(selectedIds) =>
-              selectedIds
-                .map(
-                  (selectedId) =>
-                    references.find((reference) => reference.id === selectedId)
-                      ?.title,
-                )
-                .filter(Boolean)
-                .join(', ')
+              selectedIds.length === 0
+                ? 'All'
+                : selectedIds
+                    .map(
+                      (selectedId) =>
+                        references.find(
+                          (reference) => reference.id === selectedId,
+                        )?.title,
+                    )
+                    .filter(Boolean)
+                    .join(', ')
             }
             value={referenceFilterIds}
           >
+            <MenuItem value="all">
+              <Checkbox checked={referenceFilterIds.length === 0} />
+              <ListItemText primary="All" />
+            </MenuItem>
             {references.map((reference) => (
               <MenuItem key={reference.id} value={reference.id}>
                 <Checkbox checked={referenceFilterIds.includes(reference.id)} />
@@ -840,8 +890,7 @@ export function ExercisesPage() {
             )}
 
             <Stack spacing={2} sx={{ pt: 1 }}>
-                {!editingExercise && (
-                  <FormControl required>
+                <FormControl required>
                     <InputLabel id="exercise-facilitator-label">
                       Facilitator
                     </InputLabel>
@@ -859,17 +908,12 @@ export function ExercisesPage() {
                     >
                       {users.map((user) => (
                         <MenuItem key={user.username} value={user.username}>
-                          <ListItemText
-                            primary={user.display_name}
-                            secondary={user.username}
-                          />
+                          {user.display_name}
                         </MenuItem>
                       ))}
                     </Select>
                   </FormControl>
-                )}
                 <TextField
-                  autoFocus={Boolean(editingExercise)}
                   fullWidth
                   label="Title"
                   onChange={(event) =>
