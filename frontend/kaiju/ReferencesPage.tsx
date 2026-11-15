@@ -327,7 +327,6 @@ export function ReferencesPage() {
               color="inherit"
               disabled={saving}
               onClick={closeForm}
-              variant="outlined"
             >
               Cancel
             </Button>

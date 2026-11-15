@@ -322,7 +322,6 @@ export function ObjectivesPage() {
               color="inherit"
               disabled={saving}
               onClick={closeForm}
-              variant="outlined"
             >
               Cancel
             </Button>
@@ -341,7 +340,11 @@ export function ObjectivesPage() {
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button disabled={deleting} onClick={() => setDeletingObjective(null)}>
+          <Button
+            color="inherit"
+            disabled={deleting}
+            onClick={() => setDeletingObjective(null)}
+          >
             Cancel
           </Button>
           <Button

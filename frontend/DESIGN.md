@@ -9,14 +9,16 @@ colors:
   text: "#0f172a"
   text-muted: "#64748b"
   on-primary: "#ffffff"
-  dark-primary: "#60a5fa"
-  dark-primary-hover: "#93c5fd"
-  dark-background: "#0f172a"
-  dark-surface: "#1e293b"
-  dark-border: "#334155"
-  dark-text: "#f8fafc"
-  dark-text-muted: "#94a3b8"
-  dark-on-primary: "#0f172a"
+  dark-primary: "#1e5a8a"
+  dark-secondary: "#4f6d7a"
+  accent: "#f2a541"
+  accent-light: "#f5b767"
+  accent-dark: "#a9732e"
+  dark-background: "#0f1720"
+  dark-surface: "#17212b"
+  dark-text: "#e6ecf2"
+  dark-text-muted: "rgba(230, 236, 242, 0.6)"
+  on-accent: "rgba(0, 0, 0, 0.87)"
 typography:
   h1:
     fontFamily: Inter
@@ -55,12 +57,27 @@ components:
     padding: 12px
   button-primary-dark:
     backgroundColor: "{colors.dark-primary}"
-    textColor: "{colors.dark-on-primary}"
+    textColor: "{colors.dark-text}"
     rounded: "{rounded.md}"
     padding: 12px
-  button-primary-dark-hover:
-    backgroundColor: "{colors.dark-primary-hover}"
-    textColor: "{colors.dark-on-primary}"
+  button-secondary-dark:
+    backgroundColor: "{colors.dark-secondary}"
+    textColor: "{colors.dark-text}"
+    rounded: "{rounded.md}"
+    padding: 12px
+  button-accent:
+    backgroundColor: "{colors.accent}"
+    textColor: "{colors.on-accent}"
+    rounded: "{rounded.md}"
+    padding: 12px
+  button-accent-light:
+    backgroundColor: "{colors.accent-light}"
+    textColor: "{colors.on-accent}"
+    rounded: "{rounded.md}"
+    padding: 12px
+  button-accent-dark:
+    backgroundColor: "{colors.accent-dark}"
+    textColor: "{colors.on-accent}"
     rounded: "{rounded.md}"
     padding: 12px
   card:
@@ -76,9 +93,6 @@ components:
   divider:
     backgroundColor: "{colors.border}"
     height: 1px
-  divider-dark:
-    backgroundColor: "{colors.dark-border}"
-    height: 1px
   text-muted:
     textColor: "{colors.text-muted}"
     typography: "{typography.body}"
@@ -93,7 +107,7 @@ Calm, professional, and spacious. Prioritize readability and clear hierarchy in 
 
 ## Colors
 
-Use primary for CTAs and surface for cards. Use the matching text and muted-text tokens for each mode.
+Use primary for CTAs and accent for emphasis. Use the matching surface and text tokens for each mode.
 
 Use dark mode by default. Keep the selected mode only for the current page session and reset it after a reload.
 
@@ -107,7 +121,7 @@ Use the spacing scale in front matter. Default stack gap: `{spacing.md}`.
 
 ## Components
 
-Primary button, card, divider, and text tokens drive generated UI. Use the matching `-dark` variant in dark mode.
+Primary button, card, and text tokens drive generated UI.
 
 Use token references instead of raw color values.
 
@@ -116,5 +130,5 @@ Use token references instead of raw color values.
 * Do apply one color mode consistently to the complete interface.
 * Do list intentional gaps under `omitted` instead of ignoring warnings.
 * Do run `npx @google/design.md lint DESIGN.md` before merging.
-* Don't mix light surfaces with dark-mode text tokens.
+* Don't mix light surfaces with the dark theme tokens.
 * Don't put the real palette only as `--color-*` bullets in Markdown.

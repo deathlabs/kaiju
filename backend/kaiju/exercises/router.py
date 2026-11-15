@@ -59,10 +59,30 @@ def _get_objectives(
     return objectives, invalid_ids
 
 
+def _get_references(
+    reference_ids: list[UUID],
+    allowed_references: QuerySet[Reference],
+) -> tuple[list[Reference], list[UUID]]:
+    """Get the allowed references and the IDs that are not allowed."""
+    unique_ids = list(dict.fromkeys(reference_ids))
+    references = list(allowed_references.filter(id__in=unique_ids))
+    found_ids = {reference.id for reference in references}
+    invalid_ids = [
+        reference_id for reference_id in unique_ids if reference_id not in found_ids
+    ]
+    return references, invalid_ids
+
+
 def _invalid_objectives_message(invalid_ids: list[UUID]) -> str:
     """Return an error message for objective IDs that are not allowed."""
     objective_ids = ", ".join(str(objective_id) for objective_id in invalid_ids)
     return f"Invalid objective IDs: {objective_ids}"
+
+
+def _invalid_references_message(invalid_ids: list[UUID]) -> str:
+    """Return an error message for reference IDs that are not allowed."""
+    reference_ids = ", ".join(str(reference_id) for reference_id in invalid_ids)
+    return f"Invalid reference IDs: {reference_ids}"
 
 
 @exercises_router.post(
@@ -77,7 +97,9 @@ def create_exercise(request, payload: ExerciseCreateSchema):
     """Create an exercise."""
     data = payload.model_dump()
     new_objective_data = data.pop("new_objectives")
+    new_reference_data = data.pop("new_references")
     objective_ids = data.pop("objective_ids")
+    reference_ids = data.pop("reference_ids")
     objectives, invalid_ids = _get_objectives(
         objective_ids,
         Objective.objects.all(),
@@ -85,9 +107,20 @@ def create_exercise(request, payload: ExerciseCreateSchema):
     if invalid_ids:
         return Status(400, {"message": _invalid_objectives_message(invalid_ids)})
 
+    references, invalid_ids = _get_references(
+        reference_ids,
+        Reference.objects.all(),
+    )
+    if invalid_ids:
+        return Status(400, {"message": _invalid_references_message(invalid_ids)})
+
     objectives.extend(
         Objective.objects.create(**objective_data)
         for objective_data in new_objective_data
+    )
+    references.extend(
+        Reference.objects.create(**reference_data)
+        for reference_data in new_reference_data
     )
 
     exercise = Exercise.objects.create(
@@ -96,6 +129,7 @@ def create_exercise(request, payload: ExerciseCreateSchema):
         **data,
     )
     exercise.objectives.set(objectives)
+    exercise.references.set(references)
 
     Participant.objects.create(
         exercise=exercise,
@@ -113,7 +147,10 @@ def list_exercises(request):
     """Fetch all exercises."""
     return Status(
         200,
-        Exercise.objects.select_related("created_by", "updated_by").all(),
+        Exercise.objects.select_related("created_by", "updated_by").prefetch_related(
+            "objectives",
+            "references",
+        ),
     )
 
 
@@ -156,6 +193,7 @@ def update_exercise(request, exercise_id: UUID, payload: ExerciseUpdateSchema):
     data = payload.model_dump(exclude_unset=True)
 
     new_objective_data = data.pop("new_objectives", None)
+    new_reference_data = data.pop("new_references", None)
     reference_ids = data.pop("reference_ids", None)
     objective_ids = data.pop("objective_ids", None)
 
@@ -191,12 +229,29 @@ def update_exercise(request, exercise_id: UUID, payload: ExerciseUpdateSchema):
                 },
             )
 
+    references = None
+    if reference_ids is not None:
+        references, invalid_ids = _get_references(
+            reference_ids,
+            Reference.objects.all(),
+        )
+        if invalid_ids:
+            return Status(400, {"message": _invalid_references_message(invalid_ids)})
+
     if new_objective_data:
         if objectives is None:
             objectives = list(exercise.objectives.all())
         objectives.extend(
             Objective.objects.create(**objective_data)
             for objective_data in new_objective_data
+        )
+
+    if new_reference_data:
+        if references is None:
+            references = list(exercise.references.all())
+        references.extend(
+            Reference.objects.create(**reference_data)
+            for reference_data in new_reference_data
         )
 
     for field, value in data.items():
@@ -208,8 +263,7 @@ def update_exercise(request, exercise_id: UUID, payload: ExerciseUpdateSchema):
     if objective_ids is not None or new_objective_data:
         exercise.objectives.set(objectives)
 
-    if reference_ids is not None:
-        references = Reference.objects.filter(id__in=reference_ids)
+    if reference_ids is not None or new_reference_data:
         exercise.references.set(references)
 
     return Status(200, exercise)

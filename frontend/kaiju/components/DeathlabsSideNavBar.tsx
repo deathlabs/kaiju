@@ -24,6 +24,7 @@ const DeathlabsStyledDrawer = styled(MuiDrawer, {
     easing: theme.transitions.easing.sharp,
   }),
   '& .MuiDrawer-paper': {
+    borderRight: 0,
     boxSizing: 'border-box',
     display: 'flex',
     flexDirection: 'column',
@@ -55,7 +56,7 @@ export const DeathlabsSideNavBar = ({
   const [selectedHref, setSelectedHref] = useState(() =>
     getSelectedHref(items),
   )
-  const sideNavWidth = open ? 240 : 44
+  const sideNavWidth = open ? 240 : 48
 
   useEffect(() => {
     const updateSelectedHref = () => setSelectedHref(getSelectedHref(items))
@@ -84,7 +85,7 @@ export const DeathlabsSideNavBar = ({
               href={item.href}
               aria-label={item.name}
               selected={selectedHref === item.href}
-              sx={{ minHeight: 44, px: 1.25 }}
+              sx={{ minHeight: 48, px: 1.5 }}
             >
               <Box
                 aria-hidden
@@ -92,10 +93,7 @@ export const DeathlabsSideNavBar = ({
               >
                 {item.icon}
               </Box>
-              <ListItemText
-                primary={item.name}
-                sx={{ ml: 2, opacity: open ? 1 : 0 }}
-              />
+              <ListItemText primary={item.name} sx={{ ml: 2 }} />
             </ListItemButton>
           ))}
         </List>

@@ -11,11 +11,12 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from django.contrib.auth import get_user_model
 from django.http import HttpResponse
 from django.test import TestCase, override_settings
+from jwt import encode
 
 # Local imports.
 from exercises.models import Event, Exercise
-from jwt import encode
 from objectives.models import Objective
+from references.models import Reference
 
 
 class AuthenticationTests(TestCase):
@@ -80,6 +81,7 @@ class AuthenticationTests(TestCase):
     def _create_exercise(
         self,
         objective_ids: list[str] | None = None,
+        reference_ids: list[str] | None = None,
     ) -> HttpResponse:
         payload = {
             "title": "Incident response exercise",
@@ -90,6 +92,8 @@ class AuthenticationTests(TestCase):
         }
         if objective_ids is not None:
             payload["objective_ids"] = objective_ids
+        if reference_ids is not None:
+            payload["reference_ids"] = reference_ids
 
         with self._settings():
             return self.client.post(
@@ -110,6 +114,36 @@ class AuthenticationTests(TestCase):
         self.assertEqual(response.json()["display_name"], "Vic Fernandez III")
         self.assertEqual(response.json()["username"], "Vic Fernandez III")
         self.assertEqual(response.json()["email"], "victor@deathlabs.io")
+
+    def test_metrics_returns_application_record_counts(self):
+        user_model = get_user_model()
+        user_model.objects.create_user(username="Existing user")
+        objective = Objective.objects.create(
+            title="Validate escalation",
+            description="Validate the escalation process.",
+        )
+        Reference.objects.create(
+            title="Response plan",
+            url="https://example.com/response-plan",
+        )
+        self._create_exercise([str(objective.id)])
+
+        with self._settings():
+            response = self.client.get(
+                "/api/v1/metrics",
+                **self._authorization(self._token()),
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            {
+                "exercises": 1,
+                "objectives": 1,
+                "references": 1,
+                "users": 2,
+            },
+        )
 
     def test_missing_token_is_rejected(self):
         with self._settings():
@@ -236,6 +270,34 @@ class AuthenticationTests(TestCase):
         self.assertEqual(response.json()["objectives"][0]["id"], str(objective.id))
         self.assertEqual(Exercise.objects.get().objectives.get(), objective)
 
+    def test_exercise_list_includes_objectives_and_references(self):
+        objective = Objective.objects.create(
+            title="Validate escalation",
+            description="Validate the escalation process.",
+        )
+        reference = Reference.objects.create(
+            title="Incident response plan",
+            url="https://example.com/incident-response-plan",
+        )
+        self._create_exercise(
+            objective_ids=[str(objective.id)],
+            reference_ids=[str(reference.id)],
+        )
+
+        with self._settings():
+            response = self.client.get(
+                "/api/v1/exercises/",
+                **self._authorization(self._token()),
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()[0]["scenario"],
+            "Unknown outbound traffic was observed.",
+        )
+        self.assertEqual(response.json()[0]["objectives"][0]["id"], str(objective.id))
+        self.assertEqual(response.json()[0]["references"][0]["id"], str(reference.id))
+
     def test_exercise_creation_creates_and_attaches_objectives(self):
         existing_objective = Objective.objects.create(
             title="Validate detection",
@@ -271,6 +333,52 @@ class AuthenticationTests(TestCase):
 
     def test_exercise_creation_rejects_unknown_objectives(self):
         response = self._create_exercise([str(uuid4())])
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(Exercise.objects.count(), 0)
+
+    def test_exercise_creation_attaches_references(self):
+        reference = Reference.objects.create(
+            title="Incident response plan",
+            url="https://example.com/incident-response-plan",
+        )
+
+        response = self._create_exercise(reference_ids=[str(reference.id)])
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["references"][0]["id"], str(reference.id))
+        self.assertEqual(Exercise.objects.get().references.get(), reference)
+
+    def test_exercise_creation_creates_and_attaches_references(self):
+        payload = {
+            "title": "Incident response exercise",
+            "type": "discussion",
+            "scheduled_start_time": "2026-11-16T13:00:00Z",
+            "scheduled_end_time": "2026-11-16T15:00:00Z",
+            "scenario": "Unknown outbound traffic was observed.",
+            "new_references": [
+                {
+                    "title": "Incident response plan",
+                    "url": "https://example.com/incident-response-plan",
+                }
+            ],
+        }
+
+        with self._settings():
+            response = self.client.post(
+                "/api/v1/exercises/",
+                data=json.dumps(payload),
+                content_type="application/json",
+                **self._authorization(self._token()),
+            )
+
+        self.assertEqual(response.status_code, 201)
+        reference = Reference.objects.get()
+        self.assertEqual(response.json()["references"][0]["id"], str(reference.id))
+        self.assertEqual(Exercise.objects.get().references.get(), reference)
+
+    def test_exercise_creation_rejects_unknown_references(self):
+        response = self._create_exercise(reference_ids=[str(uuid4())])
 
         self.assertEqual(response.status_code, 400)
         self.assertEqual(Exercise.objects.count(), 0)
@@ -344,6 +452,57 @@ class AuthenticationTests(TestCase):
             Exercise.objects.get(id=exercise_id).objectives.get(),
             objective,
         )
+
+    def test_exercise_update_creates_and_attaches_references(self):
+        create_response = self._create_exercise()
+        exercise_id = create_response.json()["id"]
+
+        with self._settings():
+            response = self.client.patch(
+                f"/api/v1/exercises/{exercise_id}/",
+                data=json.dumps(
+                    {
+                        "new_references": [
+                            {
+                                "title": "Incident response plan",
+                                "url": "https://example.com/incident-response-plan",
+                            }
+                        ]
+                    }
+                ),
+                content_type="application/json",
+                **self._authorization(self._token()),
+            )
+
+        self.assertEqual(response.status_code, 200)
+        reference = Reference.objects.get()
+        self.assertEqual(response.json()["references"][0]["id"], str(reference.id))
+        self.assertEqual(
+            Exercise.objects.get(id=exercise_id).references.get(),
+            reference,
+        )
+
+    def test_exercise_update_rejects_unknown_references_before_changes(self):
+        create_response = self._create_exercise()
+        exercise_id = create_response.json()["id"]
+
+        with self._settings():
+            response = self.client.patch(
+                f"/api/v1/exercises/{exercise_id}/",
+                data=json.dumps(
+                    {
+                        "title": "Invalid update",
+                        "reference_ids": [str(uuid4())],
+                    }
+                ),
+                content_type="application/json",
+                **self._authorization(self._token()),
+            )
+
+        self.assertEqual(response.status_code, 400)
+        exercise = Exercise.objects.get(id=exercise_id)
+        self.assertEqual(exercise.title, "Incident response exercise")
+        self.assertEqual(exercise.references.count(), 0)
 
     def test_event_creation_rejects_objectives_outside_exercise(self):
         exercise_objective = Objective.objects.create(

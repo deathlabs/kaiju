@@ -22,14 +22,6 @@ export interface DeathlabsThemeTokens {
     text: string
     textMuted: string
     onPrimary: string
-    darkPrimary: string
-    darkPrimaryHover: string
-    darkBackground: string
-    darkSurface: string
-    darkBorder: string
-    darkText: string
-    darkTextMuted: string
-    darkOnPrimary: string
     classification: {
       unclassified: string
       cui: string
@@ -44,12 +36,26 @@ export interface DeathlabsThemeTokens {
 }
 
 declare module '@mui/material/styles' {
+  interface Palette {
+    accent: Palette['primary']
+  }
+
+  interface PaletteOptions {
+    accent?: PaletteOptions['primary']
+  }
+
   interface Theme {
     deathlabs: DeathlabsThemeTokens
   }
 
   interface ThemeOptions {
     deathlabs?: DeathlabsThemeTokens
+  }
+}
+
+declare module '@mui/material/Button' {
+  interface ButtonPropsColorOverrides {
+    accent: true
   }
 }
 
@@ -63,14 +69,6 @@ export const deathlabsTokens = {
     text: '#0F172A',
     textMuted: '#64748B',
     onPrimary: '#FFFFFF',
-    darkPrimary: '#60A5FA',
-    darkPrimaryHover: '#93C5FD',
-    darkBackground: '#0F172A',
-    darkSurface: '#1E293B',
-    darkBorder: '#334155',
-    darkText: '#F8FAFC',
-    darkTextMuted: '#94A3B8',
-    darkOnPrimary: '#0F172A',
     classification: {
       unclassified: '#007A33',
       cui: '#502B85',
@@ -86,32 +84,6 @@ export const deathlabsTokens = {
 
 export const createDeathlabsTheme = (mode: PaletteMode) => {
   const darkMode = mode === 'dark'
-  const colors = {
-    primary: darkMode
-      ? deathlabsTokens.colors.darkPrimary
-      : deathlabsTokens.colors.primary,
-    primaryHover: darkMode
-      ? deathlabsTokens.colors.darkPrimaryHover
-      : deathlabsTokens.colors.primaryHover,
-    background: darkMode
-      ? deathlabsTokens.colors.darkBackground
-      : deathlabsTokens.colors.background,
-    surface: darkMode
-      ? deathlabsTokens.colors.darkSurface
-      : deathlabsTokens.colors.surface,
-    border: darkMode
-      ? deathlabsTokens.colors.darkBorder
-      : deathlabsTokens.colors.border,
-    text: darkMode
-      ? deathlabsTokens.colors.darkText
-      : deathlabsTokens.colors.text,
-    textMuted: darkMode
-      ? deathlabsTokens.colors.darkTextMuted
-      : deathlabsTokens.colors.textMuted,
-    onPrimary: darkMode
-      ? deathlabsTokens.colors.darkOnPrimary
-      : deathlabsTokens.colors.onPrimary,
-  }
 
   return createTheme({
     cssVariables: true,
@@ -133,18 +105,25 @@ export const createDeathlabsTheme = (mode: PaletteMode) => {
     },
     palette: {
       mode,
-      background: { default: colors.background, paper: colors.surface },
-      primary: {
-        main: colors.primary,
-        dark: colors.primaryHover,
-        contrastText: colors.onPrimary,
+      primary: { main: darkMode ? '#1E5A8A' : deathlabsTokens.colors.primary },
+      secondary: { main: darkMode ? '#4F6D7A' : deathlabsTokens.colors.primary },
+      accent: {
+        main: '#F2A541',
+        light: '#F5B767',
+        dark: '#A9732E',
+        contrastText: 'rgba(0, 0, 0, 0.87)',
       },
-      secondary: { main: colors.primary },
+      background: {
+        default: darkMode ? '#0F1720' : deathlabsTokens.colors.background,
+        paper: darkMode ? '#17212B' : deathlabsTokens.colors.surface,
+      },
       text: {
-        primary: colors.text,
-        secondary: colors.textMuted,
+        primary: darkMode ? '#E6ECF2' : deathlabsTokens.colors.text,
+        secondary: darkMode
+          ? 'rgba(230, 236, 242, 0.6)'
+          : deathlabsTokens.colors.textMuted,
       },
-      divider: colors.border,
+      divider: deathlabsTokens.colors.border,
     },
     components: {
       MuiButton: {
@@ -152,22 +131,13 @@ export const createDeathlabsTheme = (mode: PaletteMode) => {
           root: {
             borderRadius: deathlabsTokens.rounded.md,
             textTransform: 'none',
-            '&.MuiButton-containedPrimary': {
-              backgroundColor: colors.primary,
-              color: colors.onPrimary,
-              padding: 12,
-              '&:hover': {
-                backgroundColor: colors.primaryHover,
-              },
-            },
+            padding: 12,
           },
         },
       },
       MuiCard: {
         styleOverrides: {
           root: {
-            backgroundColor: colors.surface,
-            borderColor: colors.border,
             borderRadius: deathlabsTokens.rounded.md,
           },
         },

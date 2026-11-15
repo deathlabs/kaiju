@@ -1,12 +1,11 @@
+import AddLinkIcon from '@mui/icons-material/AddLink'
 import CodeIcon from '@mui/icons-material/Code'
-import DashboardIcon from '@mui/icons-material/Dashboard'
+import AnalyticsIcon from '@mui/icons-material/Analytics'
+import ContentPasteIcon from '@mui/icons-material/ContentPaste'
 import FeedbackIcon from '@mui/icons-material/Feedback'
 import FlagIcon from '@mui/icons-material/Flag'
-import FolderIcon from '@mui/icons-material/Folder'
 import HeadsetIcon from '@mui/icons-material/Headset'
 import MenuBookIcon from '@mui/icons-material/MenuBook'
-import TrackChangesIcon from '@mui/icons-material/TrackChanges'
-import Typography from '@mui/material/Typography'
 import { useEffect, useState } from 'react'
 
 import {
@@ -17,15 +16,16 @@ import {
   DeathlabsThemeProvider,
 } from './components'
 import { ExercisesPage } from './ExercisesPage'
+import { MetricsPage } from './MetricsPage'
 import { ObjectivesPage } from './ObjectivesPage'
 import { ReferencesPage } from './ReferencesPage'
 
 const sideNavBar = {
   items: [
-    { name: 'Dashboard', href: '#dashboard', icon: <DashboardIcon /> },
-    { name: 'Exercises', href: '#exercises', icon: <FolderIcon /> },
-    { name: 'Objectives', href: '#objectives', icon: <TrackChangesIcon /> },
-    { name: 'References', href: '#references', icon: <FlagIcon /> },
+    { name: 'Metrics', href: '#metrics', icon: <AnalyticsIcon /> },
+    { name: 'Exercises', href: '#exercises', icon: <ContentPasteIcon /> },
+    { name: 'Objectives', href: '#objectives', icon: <FlagIcon /> },
+    { name: 'References', href: '#references', icon: <AddLinkIcon /> },
   ],
 }
 
@@ -56,7 +56,7 @@ const topNavBar = {
 }
 
 const pageTitles = {
-  '#dashboard': 'Dashboard',
+  '#metrics': 'Metrics',
   '#exercises': 'Exercises',
   '#objectives': 'Objectives',
   '#references': 'References',
@@ -67,7 +67,7 @@ type PageHref = keyof typeof pageTitles
 const getPageHref = (): PageHref => {
   const hash = window.location.hash as PageHref
 
-  return hash in pageTitles ? hash : '#dashboard'
+  return hash in pageTitles ? hash : '#metrics'
 }
 
 function App() {
@@ -90,11 +90,7 @@ function App() {
       >
         <DeathlabsPageContent>
           <DeathlabsPageHeader>{pageTitles[pageHref]}</DeathlabsPageHeader>
-          {pageHref === '#dashboard' && (
-            <Typography color="text.secondary">
-              Plan, conduct, and review tabletop exercises.
-            </Typography>
-          )}
+          {pageHref === '#metrics' && <MetricsPage />}
           {pageHref === '#exercises' && <ExercisesPage />}
           {pageHref === '#objectives' && <ObjectivesPage />}
           {pageHref === '#references' && <ReferencesPage />}

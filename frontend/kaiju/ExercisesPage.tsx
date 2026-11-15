@@ -1,7 +1,7 @@
 import AddIcon from '@mui/icons-material/Add'
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth'
-import DeleteIcon from '@mui/icons-material/Delete'
 import GroupsIcon from '@mui/icons-material/Groups'
+import SearchIcon from '@mui/icons-material/Search'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
@@ -17,9 +17,9 @@ import DialogContent from '@mui/material/DialogContent'
 import DialogContentText from '@mui/material/DialogContentText'
 import DialogTitle from '@mui/material/DialogTitle'
 import FormControl from '@mui/material/FormControl'
-import FormHelperText from '@mui/material/FormHelperText'
 import Grid from '@mui/material/Grid'
 import InputLabel from '@mui/material/InputLabel'
+import InputAdornment from '@mui/material/InputAdornment'
 import ListItemText from '@mui/material/ListItemText'
 import MenuItem from '@mui/material/MenuItem'
 import Paper from '@mui/material/Paper'
@@ -44,14 +44,12 @@ interface Exercise {
   updated_by: ExerciseUser
   scheduled_start_time: string
   scheduled_end_time: string
+  objectives: Objective[]
+  references: Reference[]
+  scenario: string
   type: ExerciseType
   title: string
   status: ExerciseStatus
-}
-
-interface ExerciseDetails extends Exercise {
-  objectives: Objective[]
-  scenario: string
 }
 
 interface Objective {
@@ -66,9 +64,23 @@ interface NewObjective {
   description: string
 }
 
+interface Reference {
+  id: string
+  title: string
+  url: string
+}
+
+interface NewReference {
+  clientId: string
+  title: string
+  url: string
+}
+
 interface ExerciseForm {
   newObjectives: NewObjective[]
+  newReferences: NewReference[]
   objectiveIds: string[]
+  referenceIds: string[]
   title: string
   type: ExerciseType
   scheduledStartTime: string
@@ -78,14 +90,19 @@ interface ExerciseForm {
 
 const exercisesUrl = '/api/v1/exercises/'
 const objectivesUrl = '/api/v1/objectives/'
+const referencesUrl = '/api/v1/references/'
 const createObjectiveValue = 'create-objective'
+const createReferenceValue = 'create-reference'
 const newObjectiveValuePrefix = 'new-objective:'
+const newReferenceValuePrefix = 'new-reference:'
 const defaultTitle = 'Unknown Outbound Network Activity'
 const defaultScenario =
   'At 0400, unknown outbound network activity was observed from the production environment.'
 const emptyForm: ExerciseForm = {
   newObjectives: [],
+  newReferences: [],
   objectiveIds: [],
+  referenceIds: [],
   title: '',
   type: 'discussion_and_hands_on',
   scheduledStartTime: '',
@@ -146,11 +163,16 @@ const formatUserName = (user: ExerciseUser) => {
 export function ExercisesPage() {
   const [exercises, setExercises] = useState<Exercise[]>([])
   const [objectives, setObjectives] = useState<Objective[]>([])
+  const [references, setReferences] = useState<Reference[]>([])
+  const [searchQuery, setSearchQuery] = useState('')
+  const [typeFilters, setTypeFilters] = useState<ExerciseType[]>([])
+  const [objectiveFilterIds, setObjectiveFilterIds] = useState<string[]>([])
+  const [referenceFilterIds, setReferenceFilterIds] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [pageError, setPageError] = useState<string | null>(null)
   const [formOpen, setFormOpen] = useState(false)
   const [editingExercise, setEditingExercise] =
-    useState<ExerciseDetails | null>(null)
+    useState<Exercise | null>(null)
   const [form, setForm] = useState<ExerciseForm>(emptyForm)
   const [formError, setFormError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -160,8 +182,14 @@ export function ExercisesPage() {
     description: '',
   })
   const [newObjectiveError, setNewObjectiveError] = useState<string | null>(null)
+  const [newReferenceDialogOpen, setNewReferenceDialogOpen] = useState(false)
+  const [newReferenceDraft, setNewReferenceDraft] = useState({
+    title: '',
+    url: '',
+  })
+  const [newReferenceError, setNewReferenceError] = useState<string | null>(null)
   const [deletingExercise, setDeletingExercise] =
-    useState<ExerciseDetails | null>(null)
+    useState<Exercise | null>(null)
   const [deleting, setDeleting] = useState(false)
 
   const loadExercises = useCallback(async (signal?: AbortSignal) => {
@@ -169,9 +197,10 @@ export function ExercisesPage() {
     setPageError(null)
 
     try {
-      const [exercisesResponse, objectivesResponse] = await Promise.all([
+      const [exercisesResponse, objectivesResponse, referencesResponse] = await Promise.all([
         fetch(exercisesUrl, { signal }),
         fetch(objectivesUrl, { signal }),
+        fetch(referencesUrl, { signal }),
       ])
 
       if (!exercisesResponse.ok) {
@@ -180,9 +209,13 @@ export function ExercisesPage() {
       if (!objectivesResponse.ok) {
         throw new Error(await getErrorMessage(objectivesResponse))
       }
+      if (!referencesResponse.ok) {
+        throw new Error(await getErrorMessage(referencesResponse))
+      }
 
       setExercises((await exercisesResponse.json()) as Exercise[])
       setObjectives((await objectivesResponse.json()) as Objective[])
+      setReferences((await referencesResponse.json()) as Reference[])
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return
 
@@ -224,12 +257,16 @@ export function ExercisesPage() {
 
       if (!response.ok) throw new Error(await getErrorMessage(response))
 
-      const exerciseDetails = (await response.json()) as ExerciseDetails
+      const exerciseDetails = (await response.json()) as Exercise
       setEditingExercise(exerciseDetails)
       setForm({
         newObjectives: [],
+        newReferences: [],
         objectiveIds: exerciseDetails.objectives.map(
           (objective) => objective.id,
+        ),
+        referenceIds: exerciseDetails.references.map(
+          (reference) => reference.id,
         ),
         title: exerciseDetails.title,
         type: exerciseDetails.type,
@@ -281,6 +318,43 @@ export function ExercisesPage() {
       ],
     }))
     setNewObjectiveDialogOpen(false)
+  }
+
+  const openNewReferenceDialog = () => {
+    setNewReferenceDraft({ title: '', url: '' })
+    setNewReferenceError(null)
+    setNewReferenceDialogOpen(true)
+  }
+
+  const closeNewReferenceDialog = () => {
+    setNewReferenceDialogOpen(false)
+  }
+
+  const addNewReference = () => {
+    const title = newReferenceDraft.title.trim()
+    const url = newReferenceDraft.url.trim()
+
+    if (!title || !url) {
+      setNewReferenceError('Enter a title and URL.')
+      return
+    }
+
+    try {
+      const parsedUrl = new URL(url)
+      if (!['http:', 'https:'].includes(parsedUrl.protocol)) throw new Error()
+    } catch {
+      setNewReferenceError('Enter a valid HTTP or HTTPS URL.')
+      return
+    }
+
+    setForm((currentForm) => ({
+      ...currentForm,
+      newReferences: [
+        ...currentForm.newReferences,
+        { clientId: crypto.randomUUID(), title, url },
+      ],
+    }))
+    setNewReferenceDialogOpen(false)
   }
 
   const openDeleteConfirmation = () => {
@@ -355,7 +429,12 @@ export function ExercisesPage() {
             title: objective.title.trim(),
             description: objective.description.trim(),
           })),
+          new_references: form.newReferences.map((reference) => ({
+            title: reference.title.trim(),
+            url: reference.url.trim(),
+          })),
           objective_ids: form.objectiveIds,
+          reference_ids: form.referenceIds,
           title: form.title.trim() || defaultTitle,
           type: form.type,
           scheduled_start_time: new Date(form.scheduledStartTime).toISOString(),
@@ -366,13 +445,22 @@ export function ExercisesPage() {
 
       if (!response.ok) throw new Error(await getErrorMessage(response))
 
-      const savedExercise = (await response.json()) as ExerciseDetails
+      const savedExercise = (await response.json()) as Exercise
       setObjectives((currentObjectives) => [
         ...currentObjectives,
         ...savedExercise.objectives.filter(
           (savedObjective) =>
             !currentObjectives.some(
               (objective) => objective.id === savedObjective.id,
+            ),
+        ),
+      ])
+      setReferences((currentReferences) => [
+        ...currentReferences,
+        ...savedExercise.references.filter(
+          (savedReference) =>
+            !currentReferences.some(
+              (reference) => reference.id === savedReference.id,
             ),
         ),
       ])
@@ -393,23 +481,180 @@ export function ExercisesPage() {
     }
   }
 
+  const normalizedSearchQuery = searchQuery.trim().toLocaleLowerCase()
+  const filteredExercises = exercises.filter(
+    (exercise) => {
+      const searchableText = [
+        exercise.title,
+        exercise.scenario,
+        formatUserName(exercise.created_by),
+        exercise.created_by.username,
+        formatUserName(exercise.updated_by),
+        exercise.updated_by.username,
+        typeLabels[exercise.type],
+        statusLabels[exercise.status],
+        ...exercise.objectives.flatMap((objective) => [
+          objective.title,
+          objective.description,
+        ]),
+        ...exercise.references.flatMap((reference) => [
+          reference.title,
+          reference.url,
+        ]),
+      ]
+        .join(' ')
+        .toLocaleLowerCase()
+
+      return (
+        (!normalizedSearchQuery ||
+          searchableText.includes(normalizedSearchQuery)) &&
+      (typeFilters.length === 0 || typeFilters.includes(exercise.type)) &&
+      (objectiveFilterIds.length === 0 ||
+        objectiveFilterIds.some((objectiveId) =>
+          exercise.objectives.some((objective) => objective.id === objectiveId),
+        )) &&
+      (referenceFilterIds.length === 0 ||
+        referenceFilterIds.some((referenceId) =>
+          exercise.references.some((reference) => reference.id === referenceId),
+        ))
+      )
+    },
+  )
+
+  const clearFilters = () => {
+    setSearchQuery('')
+    setTypeFilters([])
+    setObjectiveFilterIds([])
+    setReferenceFilterIds([])
+  }
+
   return (
     <>
-      <Box
+      <Stack
+        direction={{ xs: 'column', lg: 'row' }}
+        spacing={2}
         sx={{
-          display: 'flex',
-          justifyContent: 'flex-end',
+          alignItems: { lg: 'center' },
           mb: 3,
         }}
       >
+        <TextField
+          onChange={(event) => setSearchQuery(event.target.value)}
+          placeholder="Search by title, scenario, author, etc."
+          size="small"
+          slotProps={{
+            htmlInput: { 'aria-label': 'Search exercises' },
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+            },
+          }}
+          sx={{ flexGrow: 1, minWidth: { lg: 240 } }}
+          value={searchQuery}
+        />
+        <FormControl size="small" sx={{ minWidth: 180 }}>
+          <InputLabel id="type-filter-label">Type</InputLabel>
+          <Select
+            label="Type"
+            labelId="type-filter-label"
+            multiple
+            onChange={(event) => {
+              const value = event.target.value
+              setTypeFilters(
+                (typeof value === 'string'
+                  ? value.split(',')
+                  : value) as ExerciseType[],
+              )
+            }}
+            renderValue={(selectedTypes) =>
+              selectedTypes.map((type) => typeLabels[type]).join(', ')
+            }
+            value={typeFilters}
+          >
+            {(Object.keys(typeLabels) as ExerciseType[]).map((type) => (
+              <MenuItem key={type} value={type}>
+                <Checkbox checked={typeFilters.includes(type)} />
+                <ListItemText primary={typeLabels[type]} />
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <FormControl size="small" sx={{ minWidth: 180 }}>
+          <InputLabel id="objective-filter-label">Objective</InputLabel>
+          <Select
+            label="Objective"
+            labelId="objective-filter-label"
+            multiple
+            onChange={(event) => {
+              const value = event.target.value
+              setObjectiveFilterIds(
+                typeof value === 'string' ? value.split(',') : value,
+              )
+            }}
+            renderValue={(selectedIds) =>
+              selectedIds
+                .map(
+                  (selectedId) =>
+                    objectives.find((objective) => objective.id === selectedId)
+                      ?.title,
+                )
+                .filter(Boolean)
+                .join(', ')
+            }
+            value={objectiveFilterIds}
+          >
+            {objectives.map((objective) => (
+              <MenuItem key={objective.id} value={objective.id}>
+                <Checkbox checked={objectiveFilterIds.includes(objective.id)} />
+                <ListItemText primary={objective.title} />
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <FormControl size="small" sx={{ minWidth: 180 }}>
+          <InputLabel id="reference-filter-label">Reference</InputLabel>
+          <Select
+            label="Reference"
+            labelId="reference-filter-label"
+            multiple
+            onChange={(event) => {
+              const value = event.target.value
+              setReferenceFilterIds(
+                typeof value === 'string' ? value.split(',') : value,
+              )
+            }}
+            renderValue={(selectedIds) =>
+              selectedIds
+                .map(
+                  (selectedId) =>
+                    references.find((reference) => reference.id === selectedId)
+                      ?.title,
+                )
+                .filter(Boolean)
+                .join(', ')
+            }
+            value={referenceFilterIds}
+          >
+            {references.map((reference) => (
+              <MenuItem key={reference.id} value={reference.id}>
+                <Checkbox checked={referenceFilterIds.includes(reference.id)} />
+                <ListItemText primary={reference.title} />
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
         <Button
           onClick={openCreateForm}
           startIcon={<AddIcon />}
+          sx={{ flexShrink: 0 }}
           variant="contained"
         >
           Create exercise
         </Button>
-      </Box>
+      </Stack>
 
       {pageError && (
         <Alert
@@ -438,13 +683,26 @@ export function ExercisesPage() {
           <Typography color="text.secondary" sx={{ mb: 3 }}>
             Start with the schedule and scenario. Add the plan after you create it.
           </Typography>
-          <Button onClick={openCreateForm} startIcon={<AddIcon />} variant="contained">
+          <Button
+            onClick={openCreateForm}
+            startIcon={<AddIcon />}
+            variant="contained"
+          >
             Create exercise
+          </Button>
+        </Paper>
+      ) : filteredExercises.length === 0 ? (
+        <Paper sx={{ p: 4, textAlign: 'center' }} variant="outlined">
+          <Typography component="h2" gutterBottom variant="h6">
+            No exercises match your filters
+          </Typography>
+          <Button color="inherit" onClick={clearFilters}>
+            Clear filters
           </Button>
         </Paper>
       ) : (
         <Grid container spacing={2}>
-          {exercises.map((exercise) => (
+          {filteredExercises.map((exercise) => (
             <Grid key={exercise.id} size={{ xs: 12, md: 6, xl: 4 }}>
               <Card variant="outlined">
                 <CardActionArea
@@ -613,7 +871,7 @@ export function ExercisesPage() {
                   >
                     <MenuItem value={createObjectiveValue}>
                       <AddIcon fontSize="small" sx={{ mr: 1 }} />
-                      Add new objective…
+                      Create objective
                     </MenuItem>
                     {objectives.map((objective) => (
                       <MenuItem key={objective.id} value={objective.id}>
@@ -639,9 +897,94 @@ export function ExercisesPage() {
                       </MenuItem>
                     ))}
                   </Select>
-                  <FormHelperText>
-                    Select existing objectives or add a new objective.
-                  </FormHelperText>
+                </FormControl>
+                <FormControl>
+                  <InputLabel id="exercise-references-label">
+                    References
+                  </InputLabel>
+                  <Select
+                    label="References"
+                    labelId="exercise-references-label"
+                    multiple
+                    onChange={(event) => {
+                      const value = event.target.value
+                      const selectedValues =
+                        typeof value === 'string' ? value.split(',') : value
+
+                      if (selectedValues.includes(createReferenceValue)) {
+                        openNewReferenceDialog()
+                        return
+                      }
+
+                      setForm((currentForm) => ({
+                        ...currentForm,
+                        newReferences: currentForm.newReferences.filter(
+                          (reference) =>
+                            selectedValues.includes(
+                              `${newReferenceValuePrefix}${reference.clientId}`,
+                            ),
+                        ),
+                        referenceIds: selectedValues.filter(
+                          (selectedValue) =>
+                            !selectedValue.startsWith(newReferenceValuePrefix),
+                        ),
+                      }))
+                    }}
+                    renderValue={(selectedIds) =>
+                      selectedIds
+                        .map((selectedId) => {
+                          if (selectedId.startsWith(newReferenceValuePrefix)) {
+                            const clientId = selectedId.slice(
+                              newReferenceValuePrefix.length,
+                            )
+                            return form.newReferences.find(
+                              (reference) => reference.clientId === clientId,
+                            )?.title
+                          }
+
+                          return references.find(
+                            (reference) => reference.id === selectedId,
+                          )?.title
+                        })
+                        .filter(Boolean)
+                        .join(', ')
+                    }
+                    value={[
+                      ...form.referenceIds,
+                      ...form.newReferences.map(
+                        (reference) =>
+                          `${newReferenceValuePrefix}${reference.clientId}`,
+                      ),
+                    ]}
+                  >
+                    <MenuItem value={createReferenceValue}>
+                      <AddIcon fontSize="small" sx={{ mr: 1 }} />
+                      Create reference
+                    </MenuItem>
+                    {references.map((reference) => (
+                      <MenuItem key={reference.id} value={reference.id}>
+                        <Checkbox
+                          checked={form.referenceIds.includes(reference.id)}
+                        />
+                        <ListItemText
+                          primary={reference.title}
+                          secondary={reference.url}
+                        />
+                      </MenuItem>
+                    ))}
+                    {form.newReferences.map((reference) => (
+                      <MenuItem
+                        key={reference.clientId}
+                        value={`${newReferenceValuePrefix}${reference.clientId}`}
+                      >
+                        <Checkbox checked />
+                        <ListItemText
+                          primary={reference.title}
+                          secondary={`${reference.url} (new)`}
+                        />
+                      </MenuItem>
+                    ))}
+                  </Select>
                 </FormControl>
                 <Grid container spacing={2}>
                   <Grid size={{ xs: 12, sm: 6 }}>
@@ -731,7 +1074,7 @@ export function ExercisesPage() {
                 color="error"
                 disabled={saving}
                 onClick={openDeleteConfirmation}
-                startIcon={<DeleteIcon />}
+                variant="contained"
               >
                 Delete
               </Button>
@@ -746,7 +1089,7 @@ export function ExercisesPage() {
         onClose={closeNewObjectiveDialog}
         open={newObjectiveDialogOpen}
       >
-        <DialogTitle>Add new objective</DialogTitle>
+        <DialogTitle>Add objective</DialogTitle>
         <DialogContent>
           {newObjectiveError && (
             <Alert severity="error" sx={{ mb: 2 }}>
@@ -764,6 +1107,7 @@ export function ExercisesPage() {
                 title: event.target.value,
               }))
             }
+            required
             value={newObjectiveDraft.title}
           />
           <TextField
@@ -778,15 +1122,68 @@ export function ExercisesPage() {
                 description: event.target.value,
               }))
             }
+            required
             value={newObjectiveDraft.description}
           />
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ justifyContent: 'flex-start' }}>
+          <Button onClick={addNewObjective} variant="contained">
+            Save
+          </Button>
           <Button color="inherit" onClick={closeNewObjectiveDialog}>
             Cancel
           </Button>
-          <Button onClick={addNewObjective} variant="contained">
-            Add objective
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        fullWidth
+        maxWidth="sm"
+        onClose={closeNewReferenceDialog}
+        open={newReferenceDialogOpen}
+      >
+        <DialogTitle>Add reference</DialogTitle>
+        <DialogContent>
+          {newReferenceError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {newReferenceError}
+            </Alert>
+          )}
+          <TextField
+            autoFocus
+            fullWidth
+            label="Title"
+            margin="dense"
+            onChange={(event) =>
+              setNewReferenceDraft((currentDraft) => ({
+                ...currentDraft,
+                title: event.target.value,
+              }))
+            }
+            required
+            value={newReferenceDraft.title}
+          />
+          <TextField
+            fullWidth
+            label="URL"
+            margin="dense"
+            onChange={(event) =>
+              setNewReferenceDraft((currentDraft) => ({
+                ...currentDraft,
+                url: event.target.value,
+              }))
+            }
+            required
+            type="url"
+            value={newReferenceDraft.url}
+          />
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: 'flex-start' }}>
+          <Button onClick={addNewReference} variant="contained">
+            Save
+          </Button>
+          <Button color="inherit" onClick={closeNewReferenceDialog}>
+            Cancel
           </Button>
         </DialogActions>
       </Dialog>

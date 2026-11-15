@@ -6,7 +6,7 @@ from uuid import UUID
 from ninja import Schema
 from objectives.schemas import ObjectiveCreateSchema, ObjectiveSchema
 from pydantic import EmailStr, Field
-from references.schemas import ReferenceSchema
+from references.schemas import ReferenceCreateSchema, ReferenceSchema
 
 # Local imports.
 from exercises.models import Exercise, Finding, Inject, Participant
@@ -216,6 +216,9 @@ class ExerciseListSchema(Schema):
     updated_by: ExerciseUserSchema
     scheduled_start_time: datetime
     scheduled_end_time: datetime
+    objectives: list[ObjectiveSchema]
+    references: list[ReferenceSchema]
+    scenario: str
     type: Exercise.Type
     title: str
     status: Exercise.Status
@@ -225,7 +228,9 @@ class ExerciseCreateSchema(Schema):
     """The fields required to create an Exercise."""
 
     new_objectives: list[ObjectiveCreateSchema] = Field(default_factory=list)
+    new_references: list[ReferenceCreateSchema] = Field(default_factory=list)
     objective_ids: list[UUID] = Field(default_factory=list)
+    reference_ids: list[UUID] = Field(default_factory=list)
     type: Exercise.Type
     scheduled_start_time: datetime
     scheduled_end_time: datetime
@@ -237,6 +242,7 @@ class ExerciseUpdateSchema(Schema):
     """The fields that can be updated on an Exercise."""
 
     new_objectives: list[ObjectiveCreateSchema] | None = None
+    new_references: list[ReferenceCreateSchema] | None = None
     reference_ids: list[UUID] | None = None
     objective_ids: list[UUID] | None = None
     type: Exercise.Type | None = None
