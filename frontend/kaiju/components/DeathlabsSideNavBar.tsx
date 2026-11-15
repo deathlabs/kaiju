@@ -56,7 +56,7 @@ export const DeathlabsSideNavBar = ({
   const [selectedHref, setSelectedHref] = useState(() =>
     getSelectedHref(items),
   )
-  const sideNavWidth = open ? 240 : 48
+  const sideNavWidth = open ? 220 : 52
 
   useEffect(() => {
     const updateSelectedHref = () => setSelectedHref(getSelectedHref(items))
@@ -77,7 +77,7 @@ export const DeathlabsSideNavBar = ({
           overflowY: 'auto',
         }}
       >
-        <List aria-label="Navigation">
+        <List aria-label="Navigation" sx={{ px: 0.5 }}>
           {items.map((item) => (
             <ListItemButton
               key={item.href}
@@ -85,15 +85,15 @@ export const DeathlabsSideNavBar = ({
               href={item.href}
               aria-label={item.name}
               selected={selectedHref === item.href}
-              sx={{ minHeight: 48, px: 1.5 }}
+              sx={{ height: 44, minHeight: 44, px: '10px', py: 0, justifyContent: 'flex-start' }}
             >
               <Box
                 aria-hidden
-                sx={{ flexShrink: 0, textAlign: 'center', width: 24 }}
+                sx={{ alignItems: 'center', display: 'flex', flexShrink: 0, justifyContent: 'center', width: 24 }}
               >
                 {item.icon}
               </Box>
-              <ListItemText primary={item.name} sx={{ ml: 2 }} />
+              <ListItemText primary={item.name} sx={{ flex: '0 0 auto', ml: 2 }} />
             </ListItemButton>
           ))}
         </List>

@@ -39,7 +39,7 @@ export const DeathlabsAppLayout = ({
       overflow: 'hidden',
     }}
   >
-    <Box sx={{ flexShrink: 0 }}>
+    <Box sx={{ flexShrink: 0, fontSize: 14 }}>
       <DeathlabsClassificationBanner
         type={classification}
         sx={{ position: 'static', width: '100%' }}

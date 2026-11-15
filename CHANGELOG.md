@@ -19,6 +19,7 @@
 - Added objective creation from the event form to frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 
 ### Changed
+- Updated the design system, increased the default text size to 16px, and centered collapsed navigation icons in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 - Changed inject senders and recipients to roles and excluded the facilitator role in backend and frontend version 0.1.0. Both components remain at version 0.1.0 from version 0.1.0.
 - Renamed the standalone seed data module in backend version 0.1.0. The backend remains at version 0.1.0 from version 0.1.0.
 - Updated backend version 0.1.0 to delete injects and participants with their exercise. The backend remains at version 0.1.0 from version 0.1.0.
