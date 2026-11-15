@@ -8,6 +8,7 @@ import Button from '@mui/material/Button'
 import Card from '@mui/material/Card'
 import CardActionArea from '@mui/material/CardActionArea'
 import CardContent from '@mui/material/CardContent'
+import Checkbox from '@mui/material/Checkbox'
 import Chip from '@mui/material/Chip'
 import CircularProgress from '@mui/material/CircularProgress'
 import Dialog from '@mui/material/Dialog'
@@ -16,8 +17,10 @@ import DialogContent from '@mui/material/DialogContent'
 import DialogContentText from '@mui/material/DialogContentText'
 import DialogTitle from '@mui/material/DialogTitle'
 import FormControl from '@mui/material/FormControl'
+import FormHelperText from '@mui/material/FormHelperText'
 import Grid from '@mui/material/Grid'
 import InputLabel from '@mui/material/InputLabel'
+import ListItemText from '@mui/material/ListItemText'
 import MenuItem from '@mui/material/MenuItem'
 import Paper from '@mui/material/Paper'
 import Select from '@mui/material/Select'
@@ -47,10 +50,25 @@ interface Exercise {
 }
 
 interface ExerciseDetails extends Exercise {
+  objectives: Objective[]
   scenario: string
 }
 
+interface Objective {
+  id: string
+  title: string
+  description: string
+}
+
+interface NewObjective {
+  clientId: string
+  title: string
+  description: string
+}
+
 interface ExerciseForm {
+  newObjectives: NewObjective[]
+  objectiveIds: string[]
   title: string
   type: ExerciseType
   scheduledStartTime: string
@@ -59,10 +77,15 @@ interface ExerciseForm {
 }
 
 const exercisesUrl = '/api/v1/exercises/'
+const objectivesUrl = '/api/v1/objectives/'
+const createObjectiveValue = 'create-objective'
+const newObjectiveValuePrefix = 'new-objective:'
 const defaultTitle = 'Unknown Outbound Network Activity'
 const defaultScenario =
   'At 0400, unknown outbound network activity was observed from the production environment.'
 const emptyForm: ExerciseForm = {
+  newObjectives: [],
+  objectiveIds: [],
   title: '',
   type: 'discussion_and_hands_on',
   scheduledStartTime: '',
@@ -122,6 +145,7 @@ const formatUserName = (user: ExerciseUser) => {
 
 export function ExercisesPage() {
   const [exercises, setExercises] = useState<Exercise[]>([])
+  const [objectives, setObjectives] = useState<Objective[]>([])
   const [loading, setLoading] = useState(true)
   const [pageError, setPageError] = useState<string | null>(null)
   const [formOpen, setFormOpen] = useState(false)
@@ -130,6 +154,12 @@ export function ExercisesPage() {
   const [form, setForm] = useState<ExerciseForm>(emptyForm)
   const [formError, setFormError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [newObjectiveDialogOpen, setNewObjectiveDialogOpen] = useState(false)
+  const [newObjectiveDraft, setNewObjectiveDraft] = useState({
+    title: '',
+    description: '',
+  })
+  const [newObjectiveError, setNewObjectiveError] = useState<string | null>(null)
   const [deletingExercise, setDeletingExercise] =
     useState<ExerciseDetails | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -139,11 +169,20 @@ export function ExercisesPage() {
     setPageError(null)
 
     try {
-      const response = await fetch(exercisesUrl, { signal })
+      const [exercisesResponse, objectivesResponse] = await Promise.all([
+        fetch(exercisesUrl, { signal }),
+        fetch(objectivesUrl, { signal }),
+      ])
 
-      if (!response.ok) throw new Error(await getErrorMessage(response))
+      if (!exercisesResponse.ok) {
+        throw new Error(await getErrorMessage(exercisesResponse))
+      }
+      if (!objectivesResponse.ok) {
+        throw new Error(await getErrorMessage(objectivesResponse))
+      }
 
-      setExercises((await response.json()) as Exercise[])
+      setExercises((await exercisesResponse.json()) as Exercise[])
+      setObjectives((await objectivesResponse.json()) as Objective[])
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return
 
@@ -188,6 +227,10 @@ export function ExercisesPage() {
       const exerciseDetails = (await response.json()) as ExerciseDetails
       setEditingExercise(exerciseDetails)
       setForm({
+        newObjectives: [],
+        objectiveIds: exerciseDetails.objectives.map(
+          (objective) => objective.id,
+        ),
         title: exerciseDetails.title,
         type: exerciseDetails.type,
         scheduledStartTime: formatDateTimeLocal(
@@ -209,6 +252,35 @@ export function ExercisesPage() {
 
   const closeForm = () => {
     if (!saving) setFormOpen(false)
+  }
+
+  const openNewObjectiveDialog = () => {
+    setNewObjectiveDraft({ title: '', description: '' })
+    setNewObjectiveError(null)
+    setNewObjectiveDialogOpen(true)
+  }
+
+  const closeNewObjectiveDialog = () => {
+    setNewObjectiveDialogOpen(false)
+  }
+
+  const addNewObjective = () => {
+    const title = newObjectiveDraft.title.trim()
+    const description = newObjectiveDraft.description.trim()
+
+    if (!title || !description) {
+      setNewObjectiveError('Enter a title and description.')
+      return
+    }
+
+    setForm((currentForm) => ({
+      ...currentForm,
+      newObjectives: [
+        ...currentForm.newObjectives,
+        { clientId: crypto.randomUUID(), title, description },
+      ],
+    }))
+    setNewObjectiveDialogOpen(false)
   }
 
   const openDeleteConfirmation = () => {
@@ -279,6 +351,11 @@ export function ExercisesPage() {
         method: editingExercise ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          new_objectives: form.newObjectives.map((objective) => ({
+            title: objective.title.trim(),
+            description: objective.description.trim(),
+          })),
+          objective_ids: form.objectiveIds,
           title: form.title.trim() || defaultTitle,
           type: form.type,
           scheduled_start_time: new Date(form.scheduledStartTime).toISOString(),
@@ -290,6 +367,15 @@ export function ExercisesPage() {
       if (!response.ok) throw new Error(await getErrorMessage(response))
 
       const savedExercise = (await response.json()) as ExerciseDetails
+      setObjectives((currentObjectives) => [
+        ...currentObjectives,
+        ...savedExercise.objectives.filter(
+          (savedObjective) =>
+            !currentObjectives.some(
+              (objective) => objective.id === savedObjective.id,
+            ),
+        ),
+      ])
       setExercises((currentExercises) =>
         editingExercise
           ? currentExercises.map((exercise) =>
@@ -466,6 +552,97 @@ export function ExercisesPage() {
                     <MenuItem value="discussion">Discussion</MenuItem>
                   </Select>
                 </FormControl>
+                <FormControl>
+                  <InputLabel id="exercise-objectives-label">
+                    Objectives
+                  </InputLabel>
+                  <Select
+                    label="Objectives"
+                    labelId="exercise-objectives-label"
+                    multiple
+                    onChange={(event) => {
+                      const value = event.target.value
+                      const selectedValues =
+                        typeof value === 'string' ? value.split(',') : value
+
+                      if (selectedValues.includes(createObjectiveValue)) {
+                        openNewObjectiveDialog()
+                        return
+                      }
+
+                      setForm((currentForm) => ({
+                        ...currentForm,
+                        newObjectives: currentForm.newObjectives.filter(
+                          (objective) =>
+                            selectedValues.includes(
+                              `${newObjectiveValuePrefix}${objective.clientId}`,
+                            ),
+                        ),
+                        objectiveIds: selectedValues.filter(
+                          (selectedValue) =>
+                            !selectedValue.startsWith(newObjectiveValuePrefix),
+                        ),
+                      }))
+                    }}
+                    renderValue={(selectedIds) =>
+                      selectedIds
+                        .map((selectedId) => {
+                          if (selectedId.startsWith(newObjectiveValuePrefix)) {
+                            const clientId = selectedId.slice(
+                              newObjectiveValuePrefix.length,
+                            )
+                            return form.newObjectives.find(
+                              (objective) => objective.clientId === clientId,
+                            )?.title
+                          }
+
+                          return objectives.find(
+                            (objective) => objective.id === selectedId,
+                          )?.title
+                        })
+                        .filter(Boolean)
+                        .join(', ')
+                    }
+                    value={[
+                      ...form.objectiveIds,
+                      ...form.newObjectives.map(
+                        (objective) =>
+                          `${newObjectiveValuePrefix}${objective.clientId}`,
+                      ),
+                    ]}
+                  >
+                    <MenuItem value={createObjectiveValue}>
+                      <AddIcon fontSize="small" sx={{ mr: 1 }} />
+                      Add new objective…
+                    </MenuItem>
+                    {objectives.map((objective) => (
+                      <MenuItem key={objective.id} value={objective.id}>
+                        <Checkbox
+                          checked={form.objectiveIds.includes(objective.id)}
+                        />
+                        <ListItemText
+                          primary={objective.title}
+                          secondary={objective.description}
+                        />
+                      </MenuItem>
+                    ))}
+                    {form.newObjectives.map((objective) => (
+                      <MenuItem
+                        key={objective.clientId}
+                        value={`${newObjectiveValuePrefix}${objective.clientId}`}
+                      >
+                        <Checkbox checked />
+                        <ListItemText
+                          primary={objective.title}
+                          secondary={`${objective.description} (new)`}
+                        />
+                      </MenuItem>
+                    ))}
+                  </Select>
+                  <FormHelperText>
+                    Select existing objectives or add a new objective.
+                  </FormHelperText>
+                </FormControl>
                 <Grid container spacing={2}>
                   <Grid size={{ xs: 12, sm: 6 }}>
                     <TextField
@@ -561,6 +738,57 @@ export function ExercisesPage() {
             )}
           </DialogActions>
         </Box>
+      </Dialog>
+
+      <Dialog
+        fullWidth
+        maxWidth="sm"
+        onClose={closeNewObjectiveDialog}
+        open={newObjectiveDialogOpen}
+      >
+        <DialogTitle>Add new objective</DialogTitle>
+        <DialogContent>
+          {newObjectiveError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {newObjectiveError}
+            </Alert>
+          )}
+          <TextField
+            autoFocus
+            fullWidth
+            label="Title"
+            margin="dense"
+            onChange={(event) =>
+              setNewObjectiveDraft((currentDraft) => ({
+                ...currentDraft,
+                title: event.target.value,
+              }))
+            }
+            value={newObjectiveDraft.title}
+          />
+          <TextField
+            fullWidth
+            label="Description"
+            margin="dense"
+            minRows={4}
+            multiline
+            onChange={(event) =>
+              setNewObjectiveDraft((currentDraft) => ({
+                ...currentDraft,
+                description: event.target.value,
+              }))
+            }
+            value={newObjectiveDraft.description}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button color="inherit" onClick={closeNewObjectiveDialog}>
+            Cancel
+          </Button>
+          <Button onClick={addNewObjective} variant="contained">
+            Add objective
+          </Button>
+        </DialogActions>
       </Dialog>
 
       <Dialog

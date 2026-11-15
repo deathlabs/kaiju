@@ -2,9 +2,11 @@
 
 ## [0.1.0] - 2026-11-13
 ### Added
+- Added objective creation and attachment during exercise updates, and validated objective relationships in backend version 0.1.0. The backend remains at version 0.1.0 from version 0.1.0.
 - Added frontend version 0.1.0 as a new component with no previous version.
 - Added Deathlabs-prefixed layout, navigation, classification, and theme components to frontend version 0.1.0. The frontend remains at version 0.1.0.
 - Added Exercises, Objectives, and References placeholder pages to frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Added objective management and exercise objective selection with dropdown creation to frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 - Added reference create, list, edit, and delete functions to frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 - Added exercise list and guided exercise creation functions to frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 - Added a current-user display and logout action to frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.

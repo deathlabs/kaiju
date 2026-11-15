@@ -3,13 +3,19 @@ import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from uuid import uuid4
 
 # Third party imports.
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from django.contrib.auth import get_user_model
+from django.http import HttpResponse
 from django.test import TestCase, override_settings
+
+# Local imports.
+from exercises.models import Event, Exercise
 from jwt import encode
+from objectives.models import Objective
 
 
 class AuthenticationTests(TestCase):
@@ -70,6 +76,28 @@ class AuthenticationTests(TestCase):
             OIDC_AUDIENCE="kaiju",
             OIDC_PUBLIC_KEY_PATH=str(self.public_key_path),
         )
+
+    def _create_exercise(
+        self,
+        objective_ids: list[str] | None = None,
+    ) -> HttpResponse:
+        payload = {
+            "title": "Incident response exercise",
+            "type": "discussion",
+            "scheduled_start_time": "2026-11-16T13:00:00Z",
+            "scheduled_end_time": "2026-11-16T15:00:00Z",
+            "scenario": "Unknown outbound traffic was observed.",
+        }
+        if objective_ids is not None:
+            payload["objective_ids"] = objective_ids
+
+        with self._settings():
+            return self.client.post(
+                "/api/v1/exercises/",
+                data=json.dumps(payload),
+                content_type="application/json",
+                **self._authorization(self._token()),
+            )
 
     def test_current_user_returns_validated_local_user(self):
         with self._settings():
@@ -194,6 +222,232 @@ class AuthenticationTests(TestCase):
         self.assertEqual(
             update_response.json()["updated_by"]["username"],
             "Grace Hopper",
+        )
+
+    def test_exercise_creation_attaches_objectives(self):
+        objective = Objective.objects.create(
+            title="Validate escalation",
+            description="Validate the escalation process.",
+        )
+
+        response = self._create_exercise([str(objective.id)])
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["objectives"][0]["id"], str(objective.id))
+        self.assertEqual(Exercise.objects.get().objectives.get(), objective)
+
+    def test_exercise_creation_creates_and_attaches_objectives(self):
+        existing_objective = Objective.objects.create(
+            title="Validate detection",
+            description="Validate the detection process.",
+        )
+        payload = {
+            "title": "Incident response exercise",
+            "type": "discussion",
+            "scheduled_start_time": "2026-11-16T13:00:00Z",
+            "scheduled_end_time": "2026-11-16T15:00:00Z",
+            "scenario": "Unknown outbound traffic was observed.",
+            "objective_ids": [str(existing_objective.id)],
+            "new_objectives": [
+                {
+                    "title": "Validate escalation",
+                    "description": "Validate the escalation process.",
+                }
+            ],
+        }
+
+        with self._settings():
+            response = self.client.post(
+                "/api/v1/exercises/",
+                data=json.dumps(payload),
+                content_type="application/json",
+                **self._authorization(self._token()),
+            )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(Objective.objects.count(), 2)
+        self.assertEqual(Exercise.objects.get().objectives.count(), 2)
+        self.assertEqual(len(response.json()["objectives"]), 2)
+
+    def test_exercise_creation_rejects_unknown_objectives(self):
+        response = self._create_exercise([str(uuid4())])
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(Exercise.objects.count(), 0)
+
+    def test_exercise_update_validates_all_objectives_before_changes(self):
+        create_response = self._create_exercise()
+        exercise_id = create_response.json()["id"]
+
+        with self._settings():
+            response = self.client.patch(
+                f"/api/v1/exercises/{exercise_id}/",
+                data=json.dumps(
+                    {
+                        "title": "Invalid update",
+                        "objective_ids": [str(uuid4())],
+                    }
+                ),
+                content_type="application/json",
+                **self._authorization(self._token()),
+            )
+
+        self.assertEqual(response.status_code, 400)
+        exercise = Exercise.objects.get(id=exercise_id)
+        self.assertEqual(exercise.title, "Incident response exercise")
+        self.assertEqual(exercise.objectives.count(), 0)
+
+    def test_exercise_update_attaches_objectives(self):
+        objective = Objective.objects.create(
+            title="Validate escalation",
+            description="Validate the escalation process.",
+        )
+        create_response = self._create_exercise()
+        exercise_id = create_response.json()["id"]
+
+        with self._settings():
+            response = self.client.patch(
+                f"/api/v1/exercises/{exercise_id}/",
+                data=json.dumps({"objective_ids": [str(objective.id)]}),
+                content_type="application/json",
+                **self._authorization(self._token()),
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["objectives"][0]["id"], str(objective.id))
+
+    def test_exercise_update_creates_and_attaches_objectives(self):
+        create_response = self._create_exercise()
+        exercise_id = create_response.json()["id"]
+
+        with self._settings():
+            response = self.client.patch(
+                f"/api/v1/exercises/{exercise_id}/",
+                data=json.dumps(
+                    {
+                        "new_objectives": [
+                            {
+                                "title": "Validate escalation",
+                                "description": "Validate the escalation process.",
+                            }
+                        ]
+                    }
+                ),
+                content_type="application/json",
+                **self._authorization(self._token()),
+            )
+
+        self.assertEqual(response.status_code, 200)
+        objective = Objective.objects.get()
+        self.assertEqual(response.json()["objectives"][0]["id"], str(objective.id))
+        self.assertEqual(
+            Exercise.objects.get(id=exercise_id).objectives.get(),
+            objective,
+        )
+
+    def test_event_creation_rejects_objectives_outside_exercise(self):
+        exercise_objective = Objective.objects.create(
+            title="Validate escalation",
+            description="Validate the escalation process.",
+        )
+        other_objective = Objective.objects.create(
+            title="Validate recovery",
+            description="Validate the recovery process.",
+        )
+        create_response = self._create_exercise([str(exercise_objective.id)])
+        exercise_id = create_response.json()["id"]
+
+        with self._settings():
+            response = self.client.post(
+                f"/api/v1/exercises/{exercise_id}/events/",
+                data=json.dumps(
+                    {
+                        "number": 1,
+                        "description": "Investigate the alert.",
+                        "objective_ids": [str(other_objective.id)],
+                    }
+                ),
+                content_type="application/json",
+                **self._authorization(self._token()),
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(Event.objects.count(), 0)
+
+    def test_event_update_rejects_objectives_outside_exercise(self):
+        exercise_objective = Objective.objects.create(
+            title="Validate escalation",
+            description="Validate the escalation process.",
+        )
+        other_objective = Objective.objects.create(
+            title="Validate recovery",
+            description="Validate the recovery process.",
+        )
+        create_response = self._create_exercise([str(exercise_objective.id)])
+        exercise_id = create_response.json()["id"]
+
+        with self._settings():
+            event_response = self.client.post(
+                f"/api/v1/exercises/{exercise_id}/events/",
+                data=json.dumps(
+                    {
+                        "number": 1,
+                        "description": "Investigate the alert.",
+                        "objective_ids": [str(exercise_objective.id)],
+                    }
+                ),
+                content_type="application/json",
+                **self._authorization(self._token()),
+            )
+            event_id = event_response.json()["id"]
+            response = self.client.patch(
+                f"/api/v1/exercises/{exercise_id}/events/{event_id}/",
+                data=json.dumps(
+                    {
+                        "description": "Invalid update.",
+                        "objective_ids": [str(other_objective.id)],
+                    }
+                ),
+                content_type="application/json",
+                **self._authorization(self._token()),
+            )
+
+        self.assertEqual(response.status_code, 400)
+        event = Event.objects.get(id=event_id)
+        self.assertEqual(event.description, "Investigate the alert.")
+        self.assertEqual(event.objectives.get(), exercise_objective)
+
+    def test_exercise_update_keeps_objectives_used_by_events(self):
+        objective = Objective.objects.create(
+            title="Validate escalation",
+            description="Validate the escalation process.",
+        )
+        create_response = self._create_exercise([str(objective.id)])
+        exercise_id = create_response.json()["id"]
+
+        with self._settings():
+            self.client.post(
+                f"/api/v1/exercises/{exercise_id}/events/",
+                data=json.dumps(
+                    {
+                        "number": 1,
+                        "description": "Investigate the alert.",
+                        "objective_ids": [str(objective.id)],
+                    }
+                ),
+                content_type="application/json",
+                **self._authorization(self._token()),
+            )
+            response = self.client.patch(
+                f"/api/v1/exercises/{exercise_id}/",
+                data=json.dumps({"objective_ids": []}),
+                content_type="application/json",
+                **self._authorization(self._token()),
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            Exercise.objects.get(id=exercise_id).objectives.get(), objective
         )
 
     def test_health_endpoint_does_not_require_token(self):

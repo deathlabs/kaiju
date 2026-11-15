@@ -17,6 +17,7 @@ import {
   DeathlabsThemeProvider,
 } from './components'
 import { ExercisesPage } from './ExercisesPage'
+import { ObjectivesPage } from './ObjectivesPage'
 import { ReferencesPage } from './ReferencesPage'
 
 const sideNavBar = {
@@ -95,6 +96,7 @@ function App() {
             </Typography>
           )}
           {pageHref === '#exercises' && <ExercisesPage />}
+          {pageHref === '#objectives' && <ObjectivesPage />}
           {pageHref === '#references' && <ReferencesPage />}
         </DeathlabsPageContent>
       </DeathlabsAppLayout>

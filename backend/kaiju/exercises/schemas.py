@@ -4,12 +4,12 @@ from uuid import UUID
 
 # Third party imports.
 from ninja import Schema
-from pydantic import EmailStr
+from objectives.schemas import ObjectiveCreateSchema, ObjectiveSchema
+from pydantic import EmailStr, Field
+from references.schemas import ReferenceSchema
 
 # Local imports.
 from exercises.models import Exercise, Finding, Inject, Participant
-from objectives.schemas import ObjectiveSchema
-from references.schemas import ReferenceSchema
 
 
 class BadRequestResponseSchema(Schema):
@@ -224,6 +224,8 @@ class ExerciseListSchema(Schema):
 class ExerciseCreateSchema(Schema):
     """The fields required to create an Exercise."""
 
+    new_objectives: list[ObjectiveCreateSchema] = Field(default_factory=list)
+    objective_ids: list[UUID] = Field(default_factory=list)
     type: Exercise.Type
     scheduled_start_time: datetime
     scheduled_end_time: datetime
@@ -234,6 +236,7 @@ class ExerciseCreateSchema(Schema):
 class ExerciseUpdateSchema(Schema):
     """The fields that can be updated on an Exercise."""
 
+    new_objectives: list[ObjectiveCreateSchema] | None = None
     reference_ids: list[UUID] | None = None
     objective_ids: list[UUID] | None = None
     type: Exercise.Type | None = None

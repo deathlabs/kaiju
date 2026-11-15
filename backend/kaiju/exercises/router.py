@@ -3,7 +3,10 @@ from uuid import UUID
 
 # Third party imports.
 from django.db import transaction
+from django.db.models import QuerySet
 from ninja import Router, Status
+from objectives.models import Objective
+from references.models import Reference
 
 # Local imports.
 from exercises.models import (
@@ -37,22 +40,62 @@ from exercises.schemas import (
     ResponseCreateSchema,
     ResponseSchema,
 )
-from objectives.models import Objective
-from references.models import Reference
 
 # Init the exercises router.
 exercises_router = Router(tags=["exercises"])
 
 
-@exercises_router.post("/", response={201: ExerciseSchema})
+def _get_objectives(
+    objective_ids: list[UUID],
+    allowed_objectives: QuerySet[Objective],
+) -> tuple[list[Objective], list[UUID]]:
+    """Get the allowed objectives and the IDs that are not allowed."""
+    unique_ids = list(dict.fromkeys(objective_ids))
+    objectives = list(allowed_objectives.filter(id__in=unique_ids))
+    found_ids = {objective.id for objective in objectives}
+    invalid_ids = [
+        objective_id for objective_id in unique_ids if objective_id not in found_ids
+    ]
+    return objectives, invalid_ids
+
+
+def _invalid_objectives_message(invalid_ids: list[UUID]) -> str:
+    """Return an error message for objective IDs that are not allowed."""
+    objective_ids = ", ".join(str(objective_id) for objective_id in invalid_ids)
+    return f"Invalid objective IDs: {objective_ids}"
+
+
+@exercises_router.post(
+    "/",
+    response={
+        201: ExerciseSchema,
+        400: BadRequestResponseSchema,
+    },
+)
 @transaction.atomic
 def create_exercise(request, payload: ExerciseCreateSchema):
     """Create an exercise."""
+    data = payload.model_dump()
+    new_objective_data = data.pop("new_objectives")
+    objective_ids = data.pop("objective_ids")
+    objectives, invalid_ids = _get_objectives(
+        objective_ids,
+        Objective.objects.all(),
+    )
+    if invalid_ids:
+        return Status(400, {"message": _invalid_objectives_message(invalid_ids)})
+
+    objectives.extend(
+        Objective.objects.create(**objective_data)
+        for objective_data in new_objective_data
+    )
+
     exercise = Exercise.objects.create(
         created_by=request.user,
         updated_by=request.user,
-        **payload.model_dump(),
+        **data,
     )
+    exercise.objectives.set(objectives)
 
     Participant.objects.create(
         exercise=exercise,
@@ -98,9 +141,11 @@ def get_exercise(request, exercise_id: UUID):
     "/{exercise_id}/",
     response={
         200: ExerciseSchema,
+        400: BadRequestResponseSchema,
         404: NotFoundResponseSchema,
     },
 )
+@transaction.atomic
 def update_exercise(request, exercise_id: UUID, payload: ExerciseUpdateSchema):
     """Update an exercise."""
     try:
@@ -110,8 +155,49 @@ def update_exercise(request, exercise_id: UUID, payload: ExerciseUpdateSchema):
 
     data = payload.model_dump(exclude_unset=True)
 
+    new_objective_data = data.pop("new_objectives", None)
     reference_ids = data.pop("reference_ids", None)
     objective_ids = data.pop("objective_ids", None)
+
+    objectives = None
+    if objective_ids is not None:
+        objectives, invalid_ids = _get_objectives(
+            objective_ids,
+            Objective.objects.all(),
+        )
+        if invalid_ids:
+            return Status(400, {"message": _invalid_objectives_message(invalid_ids)})
+
+        objective_id_set = {objective.id for objective in objectives}
+        event_objective_ids = set(
+            Objective.objects.filter(events__exercise=exercise).values_list(
+                "id",
+                flat=True,
+            )
+        )
+        removed_event_objective_ids = event_objective_ids - objective_id_set
+        if removed_event_objective_ids:
+            objective_id_list = ", ".join(
+                str(objective_id)
+                for objective_id in sorted(removed_event_objective_ids)
+            )
+            return Status(
+                400,
+                {
+                    "message": (
+                        "Objectives used by events must remain attached to the "
+                        f"exercise: {objective_id_list}"
+                    )
+                },
+            )
+
+    if new_objective_data:
+        if objectives is None:
+            objectives = list(exercise.objectives.all())
+        objectives.extend(
+            Objective.objects.create(**objective_data)
+            for objective_data in new_objective_data
+        )
 
     for field, value in data.items():
         setattr(exercise, field, value)
@@ -119,8 +205,7 @@ def update_exercise(request, exercise_id: UUID, payload: ExerciseUpdateSchema):
     exercise.updated_by = request.user
     exercise.save()
 
-    if objective_ids is not None:
-        objectives = Objective.objects.filter(id__in=objective_ids)
+    if objective_ids is not None or new_objective_data:
         exercise.objectives.set(objectives)
 
     if reference_ids is not None:
@@ -300,6 +385,7 @@ def delete_participant(request, exercise_id: UUID, participant_id: UUID):
     "/{exercise_id}/events/",
     response={
         201: EventSchema,
+        400: BadRequestResponseSchema,
         404: NotFoundResponseSchema,
     },
 )
@@ -313,13 +399,18 @@ def create_event(request, exercise_id: UUID, payload: EventCreateSchema):
 
     data = payload.model_dump()
     objective_ids = data.pop("objective_ids")
+    objectives, invalid_ids = _get_objectives(
+        objective_ids,
+        exercise.objectives.all(),
+    )
+    if invalid_ids:
+        return Status(400, {"message": _invalid_objectives_message(invalid_ids)})
 
     event = Event.objects.create(
         exercise=exercise,
         **data,
     )
 
-    objectives = Objective.objects.filter(id__in=objective_ids)
     event.objectives.set(objectives)
 
     return Status(201, event)
@@ -369,6 +460,7 @@ def get_event(request, exercise_id: UUID, event_id: UUID):
     "/{exercise_id}/events/{event_id}/",
     response={
         200: EventSchema,
+        400: BadRequestResponseSchema,
         404: NotFoundResponseSchema,
     },
 )
@@ -392,13 +484,21 @@ def update_event(
 
     objective_ids = data.pop("objective_ids", None)
 
+    objectives = None
+    if objective_ids is not None:
+        objectives, invalid_ids = _get_objectives(
+            objective_ids,
+            event.exercise.objectives.all(),
+        )
+        if invalid_ids:
+            return Status(400, {"message": _invalid_objectives_message(invalid_ids)})
+
     for field, value in data.items():
         setattr(event, field, value)
 
     event.save()
 
     if objective_ids is not None:
-        objectives = Objective.objects.filter(id__in=objective_ids)
         event.objectives.set(objectives)
 
     return Status(200, event)
