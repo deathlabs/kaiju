@@ -2,6 +2,7 @@
 
 ## [0.1.0] - 2026-11-13
 ### Added
+- Added an exercise feed within the application layout with sent inject cards that show sender and recipient roles, question and response cards from any signed-in user, and facilitator findings in backend and frontend version 0.1.0. Both components remain at version 0.1.0 from version 0.1.0.
 - Added creature illustrations to exercise cards in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 - Added a Participants tab to add existing users by role and remove exercise participants, with names listed by last name, in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 - Added primary and assistant facilitator assignments in backend and frontend version 0.1.0. Both components remain at version 0.1.0 from version 0.1.0.
@@ -26,6 +27,9 @@
 - Added objective creation from the event form to frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 
 ### Changed
+- Removed the page heading from the exercise run in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Set an exercise to In Progress when a user selects Conduct exercise in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Added the development user as an ISSM participant in Perimeter Breach in backend version 0.1.0. The backend remains at version 0.1.0 from version 0.1.0.
 - Made participant roles editable with a borderless dropdown sized to fit all roles in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 - Removed participant counts from exercise cards in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 - Expanded the seeded exercises with scenarios, a NIST reference, objectives, events, and injects in backend version 0.1.0. The backend remains at version 0.1.0 from version 0.1.0.

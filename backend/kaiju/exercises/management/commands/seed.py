@@ -13,7 +13,7 @@ from references.models import Reference
 from seed_data import ADDITIONAL_EXERCISES, seed_participants
 
 # Local imports.
-from exercises.models import Event, Exercise, Inject
+from exercises.models import Event, Exercise, Inject, Participant
 
 # Constants.
 DEVELOPMENT_EXERCISE_ID = UUID("00000000-0000-0000-0000-000000000001")
@@ -143,6 +143,15 @@ class Command(BaseCommand):
             },
         )
         seed_participants(DEVELOPMENT_EXERCISE_ID)
+        Participant.objects.update_or_create(
+            exercise=exercise,
+            email=user.email,
+            defaults={
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "role": Participant.Role.ISSM,
+            },
+        )
         reference, _ = Reference.objects.update_or_create(
             id=REFERENCE_ID,
             defaults={

@@ -7,7 +7,7 @@ from ninja import Schema
 from pydantic import EmailStr, Field
 
 # Local imports.
-from exercises.models import Exercise, Finding, Inject, Participant
+from exercises.models import Exercise, Finding, Inject, Participant, Response
 from objectives.schemas import ObjectiveCreateSchema, ObjectiveSchema
 from references.schemas import ReferenceCreateSchema, ReferenceSchema
 
@@ -67,6 +67,7 @@ class ResponseSchema(Schema):
     created_at: datetime
     participant: ParticipantSchema
     text: str
+    type: Response.Type
 
 
 class ResponseCreateSchema(Schema):
@@ -74,6 +75,13 @@ class ResponseCreateSchema(Schema):
 
     participant_id: UUID
     text: str
+
+
+class CardReplyCreateSchema(Schema):
+    """The fields required to reply to an inject card."""
+
+    type: Response.Type
+    text: str = Field(min_length=1)
 
 
 class InjectSchema(Schema):

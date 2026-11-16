@@ -31,13 +31,16 @@ class SeedDevelopmentDataTests(TestCase):
             get_user_model().objects.filter(username="Ishiro Serizawa").exists(),
         )
         self.assertEqual(Exercise.objects.count(), 7)
-        self.assertEqual(Participant.objects.count(), 280)
+        self.assertEqual(Participant.objects.count(), 281)
         self.assertEqual(Reference.objects.count(), 1)
         self.assertEqual(Objective.objects.count(), 4)
         self.assertEqual(Event.objects.count(), 21)
         self.assertEqual(Inject.objects.count(), 24)
         exercise = Exercise.objects.get(id=DEVELOPMENT_EXERCISE_ID)
         self.assertEqual(exercise.title, "Perimeter Breach")
+        participant = exercise.participants.get(email="victor@deathlabs.io")
+        self.assertEqual(participant.role, Participant.Role.ISSM)
+        self.assertEqual((participant.first_name, participant.last_name), ("Vic", "Fernandez III"))
         self.assertEqual(exercise.references.get().title, "NIST SP 800-61 Rev. 3")
         self.assertEqual(exercise.objectives.count(), 4)
         self.assertEqual(
@@ -70,7 +73,7 @@ class SeedDevelopmentDataTests(TestCase):
             },
         )
         for exercise in Exercise.objects.all():
-            self.assertEqual(exercise.participants.count(), 40)
+            self.assertEqual(exercise.participants.count(), 41 if exercise.id == DEVELOPMENT_EXERCISE_ID else 40)
             self.assertEqual(exercise.events.count(), 3)
             self.assertEqual(exercise.references.get().title, "NIST SP 800-61 Rev. 3")
             for event in exercise.events.all():

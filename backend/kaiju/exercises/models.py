@@ -98,6 +98,10 @@ class Participant(models.Model):
         related_name="participants",
         on_delete=models.CASCADE,
     )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, related_name="exercise_participations",
+        on_delete=models.SET_NULL, null=True, blank=True,
+    )
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     email = models.EmailField(
@@ -114,6 +118,10 @@ class Participant(models.Model):
             models.UniqueConstraint(
                 fields=["exercise", "email"],
                 name="unique_participant_per_exercise",
+            ),
+            models.UniqueConstraint(
+                fields=["exercise", "user"],
+                name="unique_user_per_exercise",
             ),
         )
 
@@ -198,6 +206,10 @@ class Inject(models.Model):
 
 
 class Response(models.Model):
+    class Type(models.TextChoices):
+        RESPONSE = "response", "Response"
+        QUESTION = "question", "Question"
+
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
     participant = models.ForeignKey(
@@ -211,6 +223,7 @@ class Response(models.Model):
         on_delete=models.CASCADE,
     )
     text = models.TextField()
+    type = models.CharField(max_length=20, choices=Type.choices, default=Type.RESPONSE)
 
 
 class Finding(models.Model):

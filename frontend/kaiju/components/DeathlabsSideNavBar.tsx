@@ -45,9 +45,8 @@ export interface DeathlabsSideNavBarProps {
 }
 
 const getSelectedHref = (items: readonly DeathlabsNavBarItem[]) =>
-  items.some((item) => item.href === window.location.hash)
-    ? window.location.hash
-    : items[0]?.href
+  items.find((item) => item.href === window.location.hash || window.location.hash.startsWith(`${item.href}/`))?.href
+    ?? items[0]?.href
 
 export const DeathlabsSideNavBar = ({
   items,

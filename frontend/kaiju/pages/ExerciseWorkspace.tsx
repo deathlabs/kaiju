@@ -1,3 +1,4 @@
+import { injectRoleLabels, type InjectRole } from './injectRoles'
 import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
@@ -34,7 +35,6 @@ import Typography from '@mui/material/Typography'
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react'
 
 type DeliveryMethod = 'index_card' | 'phone_call' | 'email' | 'chat_message'
-type InjectRole = 'information_system_owner' | 'information_system_security_manager' | 'information_system_security_officer' | 'system_administrator' | 'user' | 'cybersecurity_service_provider' | 'opposing_force'
 type ParticipantRole = InjectRole | 'facilitator'
 
 interface Objective {
@@ -125,16 +125,6 @@ const deliveryMethodLabels: Record<DeliveryMethod, string> = {
   chat_message: 'Chat message',
 }
 
-const injectRoleLabels: Record<InjectRole, string> = {
-  information_system_owner: 'Information System Owner',
-  information_system_security_manager: 'Information System Security Manager',
-  information_system_security_officer: 'Information System Security Officer',
-  system_administrator: 'System Administrator',
-  user: 'User',
-  cybersecurity_service_provider: 'Cybersecurity Service Provider',
-  opposing_force: 'Opposing Force',
-}
-
 const participantRoleLabels: Record<ParticipantRole, string> = {
   facilitator: 'Facilitator',
   ...injectRoleLabels,
@@ -165,6 +155,8 @@ export function ExerciseWorkspace({ exerciseId, form, onClose }: ExerciseWorkspa
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState(0)
+  const [starting, setStarting] = useState(false)
+  const [startError, setStartError] = useState<string | null>(null)
   const [eventFormOpen, setEventFormOpen] = useState(false)
   const [editingEvent, setEditingEvent] = useState<ExerciseEvent | null>(null)
   const [eventForm, setEventForm] = useState<EventForm>({ number: '', description: '', newObjectives: [], objectiveIds: [] })
@@ -206,6 +198,7 @@ export function ExerciseWorkspace({ exerciseId, form, onClose }: ExerciseWorkspa
 
   useEffect(() => {
     setParticipantError(null)
+    setStartError(null)
     setParticipantFormOpen(false)
     if (exerciseId) {
       setTab(0)
@@ -215,6 +208,25 @@ export function ExerciseWorkspace({ exerciseId, form, onClose }: ExerciseWorkspa
       setTab(0)
     }
   }, [exerciseId, loadExercise])
+
+  const conductExercise = async () => {
+    if (!exerciseId || starting) return
+    setStarting(true)
+    setStartError(null)
+    try {
+      const response = await fetch(`/api/v1/exercises/${exerciseId}/`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'in_progress' }),
+      })
+      if (!response.ok) throw new Error(await getErrorMessage(response))
+      window.location.hash = `#exercises/${exerciseId}/run`
+    } catch (startFailure) {
+      setStartError(startFailure instanceof Error ? startFailure.message : 'Could not start the exercise.')
+    } finally {
+      setStarting(false)
+    }
+  }
 
   const openEventForm = (event?: ExerciseEvent) => {
     setEditingEvent(event ?? null)
@@ -480,9 +492,10 @@ export function ExerciseWorkspace({ exerciseId, form, onClose }: ExerciseWorkspa
   return (
     <>
       <Dialog fullWidth maxWidth="lg" onClose={form ? undefined : onClose} open={Boolean(exerciseId || form)}>
+        {startError && <Alert onClose={() => setStartError(null)} severity="error">{startError}</Alert>}
         {form && tab === 0 ? (
           <>
-            <DialogTitle>Exercise</DialogTitle>
+            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>Exercise{exerciseId && <Button disabled={starting} onClick={() => void conductExercise()} variant="contained">{starting ? 'Starting…' : 'Conduct exercise'}</Button>}</DialogTitle>
             <Tabs onChange={(_, value: number) => setTab(value)} value={tab} sx={{ px: 3 }}>
               <Tab label="Overview" />
               <Tab disabled={!exerciseId} label="Participants" />
@@ -558,7 +571,7 @@ export function ExerciseWorkspace({ exerciseId, form, onClose }: ExerciseWorkspa
             </>
           ) : null}
         </DialogContent>
-        <DialogActions sx={{ justifyContent: 'flex-start' }}><Button color="inherit" onClick={onClose}>Cancel</Button></DialogActions>
+        <DialogActions sx={{ justifyContent: 'space-between' }}><Button color="inherit" onClick={onClose}>Cancel</Button><Button disabled={!exercise || starting} onClick={() => void conductExercise()} variant="contained">{starting ? 'Starting…' : 'Conduct exercise'}</Button></DialogActions>
           </>
         )}
       </Dialog>

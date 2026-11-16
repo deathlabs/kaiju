@@ -5,6 +5,7 @@ from uuid import UUID
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.db.models import Max, QuerySet
+from django.utils import timezone
 from ninja import Router, Status
 
 # Local imports.
@@ -19,6 +20,7 @@ from exercises.models import (
 from exercises.schemas import (
     AfterActionReportSchema,
     BadRequestResponseSchema,
+    CardReplyCreateSchema,
     EventCreateSchema,
     EventOrderSchema,
     EventSchema,
@@ -847,6 +849,62 @@ def delete_inject(request, exercise_id: UUID, event_id: UUID, inject_id: UUID):
     inject.delete()
 
     return Status(204, None)
+
+
+@exercises_router.post(
+    "/{exercise_id}/events/{event_id}/injects/{inject_id}/send/",
+    response={200: InjectSchema, 403: BadRequestResponseSchema, 404: NotFoundResponseSchema},
+)
+def send_inject(request, exercise_id: UUID, event_id: UUID, inject_id: UUID):
+    """Send an inject card to exercise participants."""
+    participant = Participant.objects.filter(
+        exercise_id=exercise_id, email__iexact=request.user.email,
+        role=Participant.Role.FACILITATOR,
+    ).first() if request.user.email else None
+    if participant is None:
+        return Status(403, {"message": "Only exercise facilitators can send injects."})
+    injects = Inject.objects.filter(id=inject_id, event_id=event_id, event__exercise_id=exercise_id)
+    if not injects.exists():
+        return Status(404, {"message": "Inject not found"})
+    injects.filter(started_at__isnull=True).update(started_at=timezone.now())
+    return Status(200, injects.get())
+
+
+@exercises_router.post(
+    "/{exercise_id}/events/{event_id}/injects/{inject_id}/cards/",
+    response={201: ResponseSchema, 400: BadRequestResponseSchema, 403: BadRequestResponseSchema, 404: NotFoundResponseSchema},
+)
+def create_card_reply(request, exercise_id: UUID, event_id: UUID, inject_id: UUID, payload: CardReplyCreateSchema):
+    """Add a participant reply to a sent inject card."""
+    inject = Inject.objects.filter(
+        id=inject_id, event_id=event_id, event__exercise_id=exercise_id,
+        started_at__isnull=False,
+    ).first()
+    if inject is None:
+        return Status(404, {"message": "Sent inject not found"})
+    text = payload.text.strip()
+    if not text:
+        return Status(400, {"message": "Enter a message."})
+    participant = Participant.objects.filter(exercise_id=exercise_id, user=request.user).first()
+    if participant is None and request.user.email:
+        participant = Participant.objects.filter(
+            exercise_id=exercise_id, email__iexact=request.user.email,
+        ).first()
+    if participant is not None and participant.user_id is None:
+        participant.user = request.user
+        participant.save(update_fields=["user"])
+    if participant is None:
+        participant, _ = Participant.objects.get_or_create(
+            exercise_id=exercise_id,
+            user=request.user,
+            defaults={
+                "first_name": request.user.first_name or request.user.get_username(),
+                "last_name": request.user.last_name,
+                "email": request.user.email or None,
+                "role": Participant.Role.USER,
+            },
+        )
+    return Status(201, Response.objects.create(inject=inject, participant=participant, type=payload.type, text=text))
 
 
 @exercises_router.post(

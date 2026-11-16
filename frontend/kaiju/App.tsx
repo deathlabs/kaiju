@@ -16,6 +16,7 @@ import {
   DeathlabsThemeProvider,
 } from './components'
 import { ExercisesPage } from './pages/ExercisesPage'
+import { ExerciseRun } from './pages/ExerciseRun'
 import { MetricsPage } from './pages/MetricsPage'
 import { ObjectivesPage } from './pages/ObjectivesPage'
 import { ReferencesPage } from './pages/ReferencesPage'
@@ -71,10 +72,12 @@ const getPageHref = (): PageHref => {
 }
 
 function App() {
-  const [pageHref, setPageHref] = useState(getPageHref)
+  const [hash, setHash] = useState(() => window.location.hash)
+  const pageHref = getPageHref()
+  const exerciseRun = hash.match(/^#exercises\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/run$/i)
 
   useEffect(() => {
-    const updatePage = () => setPageHref(getPageHref())
+    const updatePage = () => setHash(window.location.hash)
 
     window.addEventListener('hashchange', updatePage)
 
@@ -89,8 +92,9 @@ function App() {
         topNavBar={topNavBar}
       >
         <DeathlabsPageContent>
-          <DeathlabsPageHeader>{pageTitles[pageHref]}</DeathlabsPageHeader>
-          {pageHref === '#metrics' && <MetricsPage />}
+          {!exerciseRun && <DeathlabsPageHeader>{pageTitles[pageHref]}</DeathlabsPageHeader>}
+          {exerciseRun && <ExerciseRun exerciseId={exerciseRun[1]} onClose={() => { window.location.hash = '#exercises' }} />}
+          {!exerciseRun && pageHref === '#metrics' && <MetricsPage />}
           {pageHref === '#exercises' && <ExercisesPage />}
           {pageHref === '#objectives' && <ObjectivesPage />}
           {pageHref === '#references' && <ReferencesPage />}
