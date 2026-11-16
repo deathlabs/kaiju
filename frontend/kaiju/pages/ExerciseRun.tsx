@@ -1,18 +1,30 @@
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
+import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import { injectRoleLabels, type InjectRole } from './injectRoles'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { Alert, Box, Button, Chip, CircularProgress, Divider, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material'
+import { Alert, Box, Breadcrumbs, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Divider, IconButton, Link, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material'
 
 interface Participant { id: string; first_name: string; last_name: string; email: string | null; role: string }
 interface Reply { id: string; created_at: string; type: 'response' | 'question'; text: string; participant: Participant }
 interface Inject { id: string; number: string; sender: InjectRole; recipient: InjectRole; message: string; started_at: string | null; responses: Reply[] }
 interface Event { id: string; number: number; description: string; injects: Inject[] }
 interface Finding { id: string; type: string; topic: string; observation: string; recommendation: string }
-interface Exercise { title: string; scenario: string; participants: Participant[]; events: Event[]; findings: Finding[] }
+interface Objective { id: string; title: string; description: string }
+interface Exercise { title: string; scenario: string; type: 'discussion' | 'discussion_and_hands_on'; scheduled_start_time: string; scheduled_end_time: string; participants: Participant[]; objectives: Objective[]; events: Event[]; findings: Finding[] }
+interface ChatMessage { id: string; author_name: string; created_at: string; text: string }
 interface CurrentUser { email: string }
 
-export function ExerciseRun({ exerciseId, onClose }: { exerciseId: string; onClose: () => void }) {
+export function ExerciseRun({ exerciseId }: { exerciseId: string }) {
+  const [scenarioOpen, setScenarioOpen] = useState(true)
+  const [selectedObjective, setSelectedObjective] = useState<Objective | null>(null)
   const [exercise, setExercise] = useState<Exercise | null>(null)
   const [user, setUser] = useState<CurrentUser | null>(null)
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [chatText, setChatText] = useState('')
+  const [editing, setEditing] = useState('')
+  const [editText, setEditText] = useState('')
+  const [chatError, setChatError] = useState<string | null>(null)
+  const [sendingChat, setSendingChat] = useState(false)
   const [replyTo, setReplyTo] = useState('')
   const [replyType, setReplyType] = useState<'response' | 'question'>('response')
   const [replyText, setReplyText] = useState('')
@@ -36,6 +48,31 @@ export function ExerciseRun({ exerciseId, onClose }: { exerciseId: string; onClo
     const timer = window.setInterval(() => void load(), 5000)
     return () => window.clearInterval(timer)
   }, [load])
+  useEffect(() => {
+    setMessages([])
+    const source = new EventSource(`${url}chat/stream/`)
+    source.onmessage = (event) => { setMessages(JSON.parse(event.data) as ChatMessage[]); setChatError(null) }
+    source.onerror = () => setChatError('Chat disconnected. Reconnecting…')
+    return () => source.close()
+  }, [url])
+  const changeChat = async (method: string, path: string, text?: string) => {
+    try {
+      const result = await fetch(path, { method, headers: { 'Content-Type': 'application/json' }, body: text === undefined ? undefined : JSON.stringify({ text }) })
+      if (!result.ok) {
+        const body = await result.json().catch(() => ({})) as { message?: string; detail?: string }
+        throw new Error(body.message || body.detail || `Could not update chat (${result.status}).`)
+      }
+      if (method === 'DELETE') {
+        const messageId = path.split('/').filter(Boolean).at(-1)
+        setMessages((current) => current.filter((message) => message.id !== messageId))
+      } else {
+        const message = await result.json() as ChatMessage
+        setMessages((current) => [...current.filter((item) => item.id !== message.id), message].sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id)))
+      }
+      setChatError(null)
+      return true
+    } catch (err) { setChatError(err instanceof Error ? err.message : 'Could not update chat.'); return false }
+  }
   const participant = user?.email && exercise?.participants.find((item) => item.email?.toLowerCase() === user.email.toLowerCase())
   const facilitator = participant && participant.role === 'facilitator'
   const injects = exercise?.events.flatMap((event) => event.injects.map((inject) => ({ event, inject }))) ?? []
@@ -55,6 +92,14 @@ export function ExerciseRun({ exerciseId, onClose }: { exerciseId: string; onClo
     } catch (err) { setError(err instanceof Error ? err.message : 'Could not save the card.'); return false }
     finally { setSaving(false) }
   }
+  const sendChat = async () => {
+    const text = chatText.trim()
+    if (!text || sendingChat) return
+    setSendingChat(true)
+    try {
+      if (await changeChat('POST', `${url}chat/`, text)) setChatText('')
+    } finally { setSendingChat(false) }
+  }
   const sendReply = async (event: FormEvent, eventId: string, injectId: string) => {
     event.preventDefault()
     if (!replyText.trim()) return
@@ -67,21 +112,34 @@ export function ExerciseRun({ exerciseId, onClose }: { exerciseId: string; onClo
     if (!finding.topic.trim() || !finding.observation.trim() || !finding.recommendation.trim()) return
     if (await post(`${url}findings/`, { ...finding, topic: finding.topic.trim(), observation: finding.observation.trim(), recommendation: finding.recommendation.trim() })) setFinding({ type: 'sustainment', topic: '', observation: '', recommendation: '' })
   }
-  return <Stack spacing={3} sx={{ maxWidth: 960, mx: 'auto' }}>
-      <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
-        <Typography variant="h5">{exercise?.title}</Typography>
-        <Button onClick={onClose}>Back to exercises</Button>
-      </Stack>
+  return <Stack spacing={3}>
+      <Breadcrumbs aria-label="Breadcrumb">
+        <Link href="#exercises" underline="hover" color="inherit">Exercises</Link>
+        <Typography color="text.primary" aria-current="page">{exercise?.title || 'Exercise run'}</Typography>
+      </Breadcrumbs>
       {error && <Alert severity="error" action={<Button color="inherit" onClick={() => void load()}>Retry</Button>}>{error}</Alert>}
       {loading && <Box sx={{ textAlign: 'center', py: 5 }}><CircularProgress /></Box>}
       {exercise && <>
-        <Paper variant="outlined" sx={{ p: 2 }}><Typography variant="h6">Scenario</Typography><Typography sx={{ whiteSpace: 'pre-wrap' }}>{exercise.scenario}</Typography></Paper>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: 'minmax(0, 1fr) minmax(0, 1fr)', lg: scenarioOpen ? 'minmax(220px, 0.8fr) minmax(0, 1.5fr) minmax(300px, 1fr)' : '48px minmax(0, 1.5fr) minmax(300px, 1fr)' }, gap: 2, alignItems: 'start' }}>
+        <Paper component="section" aria-label="Exercise details" variant="outlined" sx={{ minWidth: 0, gridColumn: { md: '1 / -1', lg: 'auto' }, display: 'flex', flexDirection: 'column', minHeight: { lg: '55vh' }, justifySelf: { xs: scenarioOpen ? 'stretch' : 'start', lg: 'stretch' } }}>
+          <Stack id="scenario-details" spacing={2} hidden={!scenarioOpen} sx={{ display: scenarioOpen ? 'flex' : 'none', p: 2 }}>
+          <Box><Typography variant="subtitle2">Scenario</Typography><Typography sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{exercise.scenario}</Typography></Box>
+          <Divider />
+          <Box><Typography variant="subtitle2">Type</Typography><Typography>{exercise.type === 'discussion_and_hands_on' ? 'Discussion and Hands-On' : 'Discussion'}</Typography></Box>
+          <Box><Typography variant="subtitle2">Schedule</Typography><Typography>{new Date(exercise.scheduled_start_time).toLocaleString()} – {new Date(exercise.scheduled_end_time).toLocaleString()}</Typography></Box>
+          <Box><Typography variant="subtitle2">Objectives</Typography>{exercise.objectives.length ? <Box component="ul" sx={{ m: 0, pl: 3 }}>{exercise.objectives.map((objective) => <li key={objective.id}><Link component="button" type="button" underline="hover" onClick={() => setSelectedObjective(objective)} sx={{ textAlign: 'left', overflowWrap: 'anywhere' }}>{objective.title}</Link></li>)}</Box> : <Typography color="text.secondary">None specified.</Typography>}</Box>
+          <Box><Typography variant="subtitle2">Participants</Typography><Typography>{exercise.participants.length}</Typography></Box>
+          </Stack>
+          <Box sx={{ flexGrow: 1 }} />
+          <IconButton aria-label={scenarioOpen ? 'Collapse exercise details' : 'Expand exercise details'} aria-expanded={scenarioOpen} aria-controls="scenario-details" onClick={() => setScenarioOpen((open) => !open)} sx={{ alignSelf: 'flex-start', borderRadius: 999, justifyContent: 'flex-start', m: 0.25, width: scenarioOpen ? 'calc(100% - 4px)' : 40 }}>{scenarioOpen ? <ChevronLeftIcon /> : <ChevronRightIcon />}</IconButton>
+        </Paper>
+        <Paper component="section" aria-labelledby="exercise-feed-heading" variant="outlined" sx={{ p: 2, minWidth: 0 }}><Stack spacing={2}>
+        <Typography id="exercise-feed-heading" variant="h6">Exercise feed</Typography>
         {facilitator && <Paper variant="outlined" sx={{ p: 2 }}><Stack spacing={2}>
           <Typography variant="h6">Send an inject</Typography>
           {pending.length === 0 && <Typography color="text.secondary">No injects are waiting to be sent.</Typography>}
           {pending.map(({ event, inject }) => <Stack key={inject.id} direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: { sm: 'center' } }}><Box sx={{ flex: 1 }}><Typography>Event {event.number} · Inject {inject.number}</Typography><Typography color="text.secondary">{inject.message}</Typography></Box><Button disabled={saving} variant="contained" onClick={() => void post(`${url}events/${event.id}/injects/${inject.id}/send/`)}>Send card</Button></Stack>)}
         </Stack></Paper>}
-        <Typography variant="h6">Exercise feed</Typography>
         {sent.length === 0 && <Alert severity="info">No inject cards have been sent yet.</Alert>}
         {sent.map(({ event, inject }) => <Paper key={inject.id} variant="outlined" sx={{ p: 2 }}><Stack spacing={2}>
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}><Chip color="primary" size="small" label="Inject" /><Typography variant="subtitle1">Event {event.number} · Inject {inject.number}</Typography><Typography color="text.secondary" variant="caption">{new Date(inject.started_at!).toLocaleString()}</Typography></Stack>
@@ -101,6 +159,25 @@ export function ExerciseRun({ exerciseId, onClose }: { exerciseId: string; onClo
           {exercise.findings.map((item) => <Paper key={item.id} variant="outlined" sx={{ p: 2 }}><Typography variant="subtitle1">{item.topic} · {item.type === 'sustainment' ? 'Sustainment' : 'Improvement'}</Typography><Typography sx={{ whiteSpace: 'pre-wrap' }}>Observation: {item.observation}</Typography><Typography sx={{ whiteSpace: 'pre-wrap' }}>Recommendation: {item.recommendation}</Typography></Paper>)}
           <Box component="form" onSubmit={(event) => void saveFinding(event)}><Stack spacing={2}><Typography variant="subtitle1">Record a finding</Typography><TextField select label="Type" value={finding.type} onChange={(event) => setFinding({ ...finding, type: event.target.value })}><MenuItem value="sustainment">Sustainment</MenuItem><MenuItem value="improvement">Improvement</MenuItem></TextField><TextField required label="Topic" slotProps={{ htmlInput: { maxLength: 50 } }} value={finding.topic} onChange={(event) => setFinding({ ...finding, topic: event.target.value })} /><TextField required multiline label="Observation" value={finding.observation} onChange={(event) => setFinding({ ...finding, observation: event.target.value })} /><TextField required multiline label="Recommendation" value={finding.recommendation} onChange={(event) => setFinding({ ...finding, recommendation: event.target.value })} /><Button disabled={saving || !finding.topic.trim() || !finding.observation.trim() || !finding.recommendation.trim()} type="submit" variant="contained" sx={{ alignSelf: 'flex-start' }}>Record finding</Button></Stack></Box>
         </>}
+        </Stack></Paper>
+        <Paper component="section" aria-labelledby="exercise-chat-heading" variant="outlined" sx={{ p: 2, minWidth: 0 }}><Stack spacing={2}>
+          <Typography id="exercise-chat-heading" variant="h6">Exercise chat</Typography>
+          {chatError && <Alert severity="warning">{chatError}</Alert>}
+          <Stack spacing={2} sx={{ maxHeight: { xs: 360, lg: "55vh" }, overflowY: "auto" }}>
+          {messages.length === 0 && <Typography color="text.secondary">No messages yet.</Typography>}
+          {messages.map((message) => <Paper key={message.id} variant="outlined" sx={{ p: 2 }}><Stack spacing={1}>
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}><Typography variant="subtitle2">{message.author_name}</Typography><Typography variant="caption" color="text.secondary">{new Date(message.created_at).toLocaleString()}</Typography></Stack>
+            {editing === message.id ? <><TextField multiline value={editText} onChange={(event) => setEditText(event.target.value)} slotProps={{ htmlInput: { maxLength: 10000 } }} /><Stack direction="row"><Button disabled={!editText.trim()} onClick={() => void changeChat('PATCH', `${url}chat/${message.id}/`, editText).then((ok) => { if (ok) setEditing('') })}>Save</Button><Button onClick={() => setEditing('')}>Cancel</Button></Stack></> : <><Typography sx={{ whiteSpace: 'pre-wrap' }}>{message.text}</Typography>{facilitator && <Stack direction="row"><Button onClick={() => { setEditing(message.id); setEditText(message.text) }}>Edit</Button><Button onClick={() => { if (window.confirm('Delete this message?')) void changeChat('DELETE', `${url}chat/${message.id}/`) }}>Delete</Button></Stack>}</>}
+          </Stack></Paper>)}
+          </Stack>
+          <Box component="form" onSubmit={(event: FormEvent) => { event.preventDefault(); void sendChat() }}><Stack spacing={1}><TextField label="Message everyone" multiline value={chatText} onChange={(event) => setChatText(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void sendChat() } }} helperText="Press Enter to send or Shift+Enter for a new line." slotProps={{ htmlInput: { maxLength: 10000 } }} /><Button type="submit" variant="contained" disabled={!chatText.trim() || sendingChat} sx={{ alignSelf: 'flex-start' }}>{sendingChat ? 'Sending…' : 'Send message'}</Button></Stack></Box>
+        </Stack></Paper>
+        </Box>
       </>}
+      <Dialog open={selectedObjective !== null} onClose={() => setSelectedObjective(null)} fullWidth maxWidth="sm" aria-labelledby="objective-dialog-title">
+        <DialogTitle id="objective-dialog-title">{selectedObjective?.title}</DialogTitle>
+        <DialogContent><Typography sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{selectedObjective?.description}</Typography></DialogContent>
+        <DialogActions><Button onClick={() => setSelectedObjective(null)}>Close</Button></DialogActions>
+      </Dialog>
     </Stack>
 }

@@ -93,7 +93,7 @@ function App() {
       >
         <DeathlabsPageContent>
           {!exerciseRun && <DeathlabsPageHeader>{pageTitles[pageHref]}</DeathlabsPageHeader>}
-          {exerciseRun && <ExerciseRun exerciseId={exerciseRun[1]} onClose={() => { window.location.hash = '#exercises' }} />}
+          {exerciseRun && <ExerciseRun exerciseId={exerciseRun[1]} />}
           {!exerciseRun && pageHref === '#metrics' && <MetricsPage />}
           {pageHref === '#exercises' && <ExercisesPage />}
           {pageHref === '#objectives' && <ObjectivesPage />}

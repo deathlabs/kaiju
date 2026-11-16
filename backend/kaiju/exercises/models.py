@@ -251,3 +251,14 @@ class Finding(models.Model):
 
     def __str__(self) -> str:
         return self.topic
+
+
+class ChatMessage(models.Model):
+    """A free-form message shared with an exercise."""
+
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    exercise = models.ForeignKey(Exercise, related_name="chat_messages", on_delete=models.CASCADE)
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    author_name = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+    text = models.TextField()

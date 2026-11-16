@@ -297,3 +297,18 @@ class AfterActionReportSchema(Schema):
     """The fields of an After Action Report."""
 
     exercise: ExerciseSchema
+
+
+class ChatTextSchema(Schema):
+    """The text of a chat message."""
+
+    text: str = Field(max_length=10000)
+
+
+class ChatMessageSchema(Schema):
+    """A current exercise chat message."""
+
+    id: UUID
+    author_name: str
+    created_at: datetime
+    text: str

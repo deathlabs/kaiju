@@ -163,6 +163,13 @@ const statusLabels: Record<ExerciseStatus, string> = {
   completed: 'Completed',
 }
 
+const statusOrder: Record<ExerciseStatus, number> = {
+  in_progress: 0,
+  prepared: 1,
+  planned: 2,
+  completed: 3,
+}
+
 const statusColors: Record<ExerciseStatus, 'default' | 'info' | 'warning' | 'success'> = {
   planned: 'default',
   prepared: 'info',
@@ -626,7 +633,7 @@ export function ExercisesPage() {
         ))
       )
     },
-  )
+  ).sort((first, second) => statusOrder[first.status] - statusOrder[second.status])
 
   const clearFilters = () => {
     setSearchQuery('')

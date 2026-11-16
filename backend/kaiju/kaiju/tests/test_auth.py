@@ -1066,3 +1066,28 @@ class AuthenticationTests(TestCase):
         response = self.client.get("/api/v1/health/")
 
         self.assertEqual(response.status_code, 200)
+
+    def test_exercise_chat_permissions_and_message_lifecycle(self):
+        exercise_id = self._create_exercise().json()["id"]
+        user = get_user_model().objects.get(username="Vic Fernandez III")
+        participant = Participant.objects.get(exercise_id=exercise_id, email=user.email)
+        participant.role = Participant.Role.USER
+        participant.save(update_fields=["role"])
+        path = f"/api/v1/exercises/{exercise_id}/chat/"
+        headers = self._authorization(self._token())
+        with self._settings():
+            response = self.client.post(path, data=json.dumps({"text": " Hello "}), content_type="application/json", **headers)
+            self.assertEqual(response.status_code, 201)
+            message_id = response.json()["id"]
+            self.assertEqual(self.client.get(path, **headers).json()[0]["text"], "Hello")
+            message_path = f"{path}{message_id}/"
+            self.assertEqual(self.client.patch(message_path, data=json.dumps({"text": "Edited"}), content_type="application/json", **headers).status_code, 403)
+            participant.role = Participant.Role.FACILITATOR
+            participant.save(update_fields=["role"])
+            self.assertEqual(self.client.patch(message_path, data=json.dumps({"text": "Edited"}), content_type="application/json", **headers).status_code, 200)
+            self.assertEqual(self.client.get(path, **headers).json()[0]["text"], "Edited")
+            self.assertEqual(self.client.delete(message_path, **headers).status_code, 204)
+            self.assertEqual(self.client.get(path, **headers).json(), [])
+            participant.delete()
+            self.assertEqual(self.client.get(path, **headers).status_code, 403)
+            self.assertEqual(self.client.post(path, data=json.dumps({"text": "Denied"}), content_type="application/json", **headers).status_code, 403)

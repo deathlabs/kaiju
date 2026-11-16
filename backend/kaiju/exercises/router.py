@@ -9,7 +9,9 @@ from django.utils import timezone
 from ninja import Router, Status
 
 # Local imports.
+from exercises.chat import history, notify, participant_for
 from exercises.models import (
+    ChatMessage,
     Event,
     Exercise,
     Finding,
@@ -21,6 +23,8 @@ from exercises.schemas import (
     AfterActionReportSchema,
     BadRequestResponseSchema,
     CardReplyCreateSchema,
+    ChatMessageSchema,
+    ChatTextSchema,
     EventCreateSchema,
     EventOrderSchema,
     EventSchema,
@@ -1165,3 +1169,59 @@ def get_after_action_report(request, exercise_id: UUID):
         return Status(404, {"message": "Exercise not found"})
 
     return Status(200, {"exercise": exercise})
+
+
+@exercises_router.get("/{exercise_id}/chat/", response={200: list[ChatMessageSchema], 403: BadRequestResponseSchema})
+def list_chat(request, exercise_id: UUID):
+    """Return the current exercise chat history."""
+    if participant_for(request.user, exercise_id) is None:
+        return Status(403, {"message": "Exercise participation required."})
+    return Status(200, history(exercise_id))
+
+
+@exercises_router.post("/{exercise_id}/chat/", response={201: ChatMessageSchema, 400: BadRequestResponseSchema, 403: BadRequestResponseSchema})
+@transaction.atomic
+def create_chat(request, exercise_id: UUID, payload: ChatTextSchema):
+    """Send a message to the exercise."""
+    participant = participant_for(request.user, exercise_id)
+    if participant is None:
+        return Status(403, {"message": "Exercise participation required."})
+    text = payload.text.strip()
+    if not text:
+        return Status(400, {"message": "Enter a message."})
+    message = ChatMessage.objects.create(exercise_id=exercise_id, author=request.user, author_name=f"{participant.first_name} {participant.last_name}".strip(), text=text)
+    notify(exercise_id)
+    return Status(201, {"id": message.id, "author_name": message.author_name, "created_at": message.created_at, "text": message.text})
+
+
+@exercises_router.patch("/{exercise_id}/chat/{message_id}/", response={200: ChatMessageSchema, 400: BadRequestResponseSchema, 403: BadRequestResponseSchema, 404: NotFoundResponseSchema})
+@transaction.atomic
+def update_chat(request, exercise_id: UUID, message_id: UUID, payload: ChatTextSchema):
+    """Replace a message as an exercise facilitator."""
+    participant = participant_for(request.user, exercise_id)
+    if participant is None or participant.role != Participant.Role.FACILITATOR:
+        return Status(403, {"message": "Exercise facilitator required."})
+    text = payload.text.strip()
+    if not text:
+        return Status(400, {"message": "Enter a message."})
+    message = ChatMessage.objects.filter(exercise_id=exercise_id, id=message_id).first()
+    if message is None:
+        return Status(404, {"message": "Message not found."})
+    message.text = text
+    message.save(update_fields=["text"])
+    notify(exercise_id)
+    return Status(200, {"id": message.id, "author_name": message.author_name, "created_at": message.created_at, "text": message.text})
+
+
+@exercises_router.delete("/{exercise_id}/chat/{message_id}/", response={204: None, 403: BadRequestResponseSchema, 404: NotFoundResponseSchema})
+@transaction.atomic
+def delete_chat(request, exercise_id: UUID, message_id: UUID):
+    """Delete a message as an exercise facilitator."""
+    participant = participant_for(request.user, exercise_id)
+    if participant is None or participant.role != Participant.Role.FACILITATOR:
+        return Status(403, {"message": "Exercise facilitator required."})
+    deleted, _ = ChatMessage.objects.filter(exercise_id=exercise_id, id=message_id).delete()
+    if not deleted:
+        return Status(404, {"message": "Message not found."})
+    notify(exercise_id)
+    return Status(204, None)
