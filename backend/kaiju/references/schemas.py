@@ -32,11 +32,19 @@ class ReferenceUpdateSchema(Schema):
     url: AnyHttpUrl | None = None
 
 
+class ReferenceExerciseSchema(Schema):
+    """The exercise fields displayed for a reference relationship."""
+
+    id: UUID
+    title: str
+
+
 class ReferenceSchema(Schema):
     """The fields of a Reference."""
 
     id: UUID
     exercise_count: int = 0
+    exercises: list[ReferenceExerciseSchema]
     type: Reference.Type
     title: str
     url: AnyHttpUrl

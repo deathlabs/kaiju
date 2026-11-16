@@ -1,6 +1,8 @@
 import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
@@ -29,10 +31,11 @@ import TableRow from '@mui/material/TableRow'
 import Tabs from '@mui/material/Tabs'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react'
 
 type DeliveryMethod = 'index_card' | 'phone_call' | 'email' | 'chat_message'
 type InjectRole = 'information_system_owner' | 'information_system_security_manager' | 'information_system_security_officer' | 'system_administrator' | 'user' | 'cybersecurity_service_provider' | 'opposing_force'
+type ParticipantRole = InjectRole | 'facilitator'
 
 interface Objective {
   id: string
@@ -51,7 +54,14 @@ interface Participant {
   first_name: string
   last_name: string
   email: string | null
-  role: string
+  role: ParticipantRole
+}
+
+interface SelectableUser {
+  username: string
+  display_name: string
+  first_name: string
+  last_name: string
 }
 
 interface Inject {
@@ -87,8 +97,8 @@ export interface ExerciseDetail {
 
 interface ExerciseWorkspaceProps {
   exerciseId: string | null
+  form: ReactNode
   onClose: () => void
-  onEdit: () => void
 }
 
 interface EventForm {
@@ -125,6 +135,11 @@ const injectRoleLabels: Record<InjectRole, string> = {
   opposing_force: 'Opposing Force',
 }
 
+const participantRoleLabels: Record<ParticipantRole, string> = {
+  facilitator: 'Facilitator',
+  ...injectRoleLabels,
+}
+
 const createObjectiveValue = 'create-objective'
 const newObjectiveValuePrefix = 'new-objective:'
 
@@ -145,10 +160,7 @@ const getErrorMessage = async (response: Response) => {
   return `The request failed with status ${response.status}.`
 }
 
-const participantName = (participant: Participant) =>
-  `${participant.first_name} ${participant.last_name}`.trim() || participant.email || 'Unnamed participant'
-
-export function ExerciseWorkspace({ exerciseId, onClose, onEdit }: ExerciseWorkspaceProps) {
+export function ExerciseWorkspace({ exerciseId, form, onClose }: ExerciseWorkspaceProps) {
   const [exercise, setExercise] = useState<ExerciseDetail | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -159,6 +171,8 @@ export function ExerciseWorkspace({ exerciseId, onClose, onEdit }: ExerciseWorks
   const [newObjectiveDialogOpen, setNewObjectiveDialogOpen] = useState(false)
   const [newObjectiveDraft, setNewObjectiveDraft] = useState({ title: '', description: '' })
   const [newObjectiveError, setNewObjectiveError] = useState<string | null>(null)
+  const [newInjects, setNewInjects] = useState<(InjectForm & { clientId: string })[]>([])
+  const [injectError, setInjectError] = useState<string | null>(null)
   const [injectFormOpen, setInjectFormOpen] = useState(false)
   const [injectEvent, setInjectEvent] = useState<ExerciseEvent | null>(null)
   const [editingInject, setEditingInject] = useState<Inject | null>(null)
@@ -167,6 +181,13 @@ export function ExerciseWorkspace({ exerciseId, onClose, onEdit }: ExerciseWorks
   })
   const [formError, setFormError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [reordering, setReordering] = useState(false)
+  const [participantFormOpen, setParticipantFormOpen] = useState(false)
+  const [users, setUsers] = useState<SelectableUser[]>([])
+  const [loadingUsers, setLoadingUsers] = useState(false)
+  const [participantForm, setParticipantForm] = useState<{ username: string; role: ParticipantRole }>({ username: '', role: 'information_system_owner' })
+  const [participantError, setParticipantError] = useState<string | null>(null)
+  const [updatingParticipantId, setUpdatingParticipantId] = useState<string | null>(null)
 
   const loadExercise = useCallback(async () => {
     if (!exerciseId) return
@@ -184,22 +205,26 @@ export function ExerciseWorkspace({ exerciseId, onClose, onEdit }: ExerciseWorks
   }, [exerciseId])
 
   useEffect(() => {
+    setParticipantError(null)
+    setParticipantFormOpen(false)
     if (exerciseId) {
       setTab(0)
       void loadExercise()
     } else {
       setExercise(null)
+      setTab(0)
     }
   }, [exerciseId, loadExercise])
 
   const openEventForm = (event?: ExerciseEvent) => {
     setEditingEvent(event ?? null)
     setEventForm({
-      number: String(event?.number ?? ((exercise?.events.length ?? 0) + 1)),
+      number: String(event?.number ?? (Math.max(0, ...(exercise?.events.map((item) => item.number) ?? [])) + 1)),
       description: event?.description ?? '',
       newObjectives: [],
       objectiveIds: event?.objectives.map((objective) => objective.id) ?? [],
     })
+    setNewInjects([])
     setFormError(null)
     setEventFormOpen(true)
   }
@@ -249,6 +274,15 @@ export function ExerciseWorkspace({ exerciseId, onClose, onEdit }: ExerciseWorks
             description: objective.description,
           })),
           objective_ids: eventForm.objectiveIds,
+          new_injects: newInjects.map((inject) => ({
+            number: inject.number.trim(),
+            scheduled_start_time: new Date(inject.scheduledStartTime).toISOString(),
+            delivery_method: inject.deliveryMethod,
+            sender: inject.sender,
+            recipient: inject.recipient,
+            message: inject.message.trim(),
+            expected_response: inject.expectedResponse.trim(),
+          })),
         }),
       })
       if (!response.ok) throw new Error(await getErrorMessage(response))
@@ -268,11 +302,42 @@ export function ExerciseWorkspace({ exerciseId, onClose, onEdit }: ExerciseWorks
     else setError(await getErrorMessage(response))
   }
 
-  const openInjectForm = (event: ExerciseEvent, inject?: Inject) => {
+  const reorderEvents = async (eventId: string, targetIndex: number) => {
+    if (!exercise || reordering) return
+    const sourceIndex = exercise.events.findIndex((event) => event.id === eventId)
+    if (sourceIndex < 0 || targetIndex < 0 || targetIndex >= exercise.events.length || sourceIndex === targetIndex) return
+    const events = [...exercise.events]
+    const [movedEvent] = events.splice(sourceIndex, 1)
+    events.splice(targetIndex, 0, movedEvent)
+    setReordering(true)
+    setError(null)
+    try {
+      const response = await fetch(`/api/v1/exercises/${exercise.id}/events/order/`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event_ids: events.map((event) => event.id) }),
+      })
+      if (!response.ok) throw new Error(await getErrorMessage(response))
+      setExercise((current) => current?.id === exercise.id ? { ...current, events } : current)
+    } catch (reorderError) {
+      setError(reorderError instanceof Error ? reorderError.message : 'Could not reorder events.')
+    } finally {
+      setReordering(false)
+    }
+  }
+
+  const openInjectForm = (event: ExerciseEvent | null, inject?: Inject) => {
     setInjectEvent(event)
+    const usedNumbers = new Set([...(event?.injects ?? []).map((item) => item.number), ...newInjects.map((item) => item.number)])
+    let suffix = 0
+    let defaultNumber = `${eventForm.number}${String.fromCharCode(65 + suffix)}`
+    while (usedNumbers.has(defaultNumber)) {
+      suffix += 1
+      defaultNumber = `${eventForm.number}${suffix < 26 ? String.fromCharCode(65 + suffix) : suffix + 1}`
+    }
     setEditingInject(inject ?? null)
     setInjectForm({
-      number: inject?.number ?? `${event.number}${String.fromCharCode(65 + event.injects.length)}`,
+      number: inject?.number ?? defaultNumber,
       scheduledStartTime: formatDateTimeLocal(inject?.scheduled_start_time ?? exercise?.scheduled_start_time ?? new Date().toISOString()),
       deliveryMethod: inject?.delivery_method ?? 'email',
       sender: inject?.sender ?? 'cybersecurity_service_provider',
@@ -280,15 +345,30 @@ export function ExerciseWorkspace({ exerciseId, onClose, onEdit }: ExerciseWorks
       message: inject?.message ?? '',
       expectedResponse: inject?.expected_response ?? '',
     })
-    setFormError(null)
+    setInjectError(null)
     setInjectFormOpen(true)
   }
 
   const saveInject = async (submitEvent: FormEvent) => {
     submitEvent.preventDefault()
-    if (!exercise || !injectEvent) return
+    if (!exercise) return
+    const number = injectForm.number.trim()
+    if (!number || number.length > 10 || !injectForm.message.trim()) {
+      setInjectError('Enter an inject number of up to 10 characters and a message.')
+      return
+    }
+    if (!editingInject) {
+      if (newInjects.some((inject) => inject.number.trim() === number) || editingEvent?.injects.some((inject) => inject.number === number)) {
+        setInjectError('Each inject number must be unique within the event.')
+        return
+      }
+      setNewInjects((current) => [...current, { ...injectForm, number, clientId: crypto.randomUUID() }])
+      setInjectFormOpen(false)
+      return
+    }
+    if (!injectEvent) return
     setSaving(true)
-    setFormError(null)
+    setInjectError(null)
     try {
       const url = editingInject
         ? `/api/v1/exercises/${exercise.id}/events/${injectEvent.id}/injects/${editingInject.id}/`
@@ -310,7 +390,7 @@ export function ExerciseWorkspace({ exerciseId, onClose, onEdit }: ExerciseWorks
       setInjectFormOpen(false)
       await loadExercise()
     } catch (saveError) {
-      setFormError(saveError instanceof Error ? saveError.message : 'Could not save the inject.')
+      setInjectError(saveError instanceof Error ? saveError.message : 'Could not save the inject.')
     } finally {
       setSaving(false)
     }
@@ -323,10 +403,96 @@ export function ExerciseWorkspace({ exerciseId, onClose, onEdit }: ExerciseWorks
     else setError(await getErrorMessage(response))
   }
 
+  const openParticipantForm = async () => {
+    setParticipantForm({ username: '', role: 'information_system_owner' })
+    setParticipantError(null)
+    setUsers([])
+    setParticipantFormOpen(true)
+    setLoadingUsers(true)
+    try {
+      const response = await fetch('/api/v1/users')
+      if (!response.ok) throw new Error(await getErrorMessage(response))
+      const availableUsers = (await response.json()) as SelectableUser[]
+      setUsers(availableUsers.sort((a, b) => (a.last_name || a.display_name).localeCompare(b.last_name || b.display_name) || a.first_name.localeCompare(b.first_name)))
+    } catch (loadError) {
+      setParticipantError(loadError instanceof Error ? loadError.message : 'Could not load users.')
+    } finally {
+      setLoadingUsers(false)
+    }
+  }
+
+  const saveParticipant = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!exercise) return
+    const user = users.find((item) => item.username === participantForm.username)
+    if (!user) {
+      setParticipantError('Select a user.')
+      return
+    }
+    setSaving(true)
+    setParticipantError(null)
+    try {
+      const response = await fetch(`/api/v1/exercises/${exercise.id}/participants/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ first_name: user.first_name || user.display_name, last_name: user.last_name, role: participantForm.role }),
+      })
+      if (!response.ok) throw new Error(await getErrorMessage(response))
+      setParticipantFormOpen(false)
+      await loadExercise()
+    } catch (saveError) {
+      setParticipantError(saveError instanceof Error ? saveError.message : 'Could not save the participant.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const updateParticipantRole = async (participant: Participant, role: ParticipantRole) => {
+    if (!exercise || role === participant.role) return
+    setUpdatingParticipantId(participant.id)
+    setParticipantError(null)
+    try {
+      const response = await fetch(`/api/v1/exercises/${exercise.id}/participants/${participant.id}/`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role }),
+      })
+      if (!response.ok) throw new Error(await getErrorMessage(response))
+      await loadExercise()
+    } catch (saveError) {
+      setParticipantError(saveError instanceof Error ? saveError.message : 'Could not update the participant role.')
+    } finally {
+      setUpdatingParticipantId(null)
+    }
+  }
+
+  const deleteParticipant = async (participant: Participant) => {
+    if (!exercise || !window.confirm(`Remove ${participant.first_name} ${participant.last_name} and their recorded responses from this exercise?`)) return
+    try {
+      const response = await fetch(`/api/v1/exercises/${exercise.id}/participants/${participant.id}/`, { method: 'DELETE' })
+      if (!response.ok) throw new Error(await getErrorMessage(response))
+      await loadExercise()
+    } catch (deleteError) {
+      setParticipantError(deleteError instanceof Error ? deleteError.message : 'Could not remove the participant.')
+    }
+  }
+
   return (
     <>
-      <Dialog fullWidth maxWidth="lg" onClose={onClose} open={Boolean(exerciseId)}>
-        <DialogTitle>{exercise?.title ?? 'Exercise'}</DialogTitle>
+      <Dialog fullWidth maxWidth="lg" onClose={form ? undefined : onClose} open={Boolean(exerciseId || form)}>
+        {form && tab === 0 ? (
+          <>
+            <DialogTitle>Exercise</DialogTitle>
+            <Tabs onChange={(_, value: number) => setTab(value)} value={tab} sx={{ px: 3 }}>
+              <Tab label="Overview" />
+              <Tab disabled={!exerciseId} label="Participants" />
+              <Tab disabled={!exerciseId} label="Master Scenario Event List" />
+            </Tabs>
+            {form}
+          </>
+        ) : (
+          <>
+        <DialogTitle>Exercise</DialogTitle>
         <DialogContent dividers>
           {loading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}><CircularProgress /></Box>
@@ -336,37 +502,47 @@ export function ExerciseWorkspace({ exerciseId, onClose, onEdit }: ExerciseWorks
             <>
               <Tabs onChange={(_, value: number) => setTab(value)} value={tab}>
                 <Tab label="Overview" />
+                <Tab label="Participants" />
                 <Tab label="Master Scenario Event List" />
               </Tabs>
-              {tab === 0 && (
-                <Box sx={{ display: 'grid', gap: 3, gridTemplateColumns: { xs: '1fr', md: 'repeat(3, minmax(0, 1fr))' }, pt: 3 }}>
-                  <Stack spacing={3}>
-                    <Box><Typography color="text.secondary" variant="overline">Facilitator</Typography><Typography>{exercise.participants.filter((participant) => participant.role === 'facilitator').map(participantName).join(', ') || 'No facilitator'}</Typography></Box>
-                    <Box><Typography color="text.secondary" variant="overline">Participants</Typography><Typography>{exercise.participants.map(participantName).join(', ') || 'No participants'}</Typography></Box>
-                  </Stack>
-                  <Stack spacing={3}>
-                    <Box><Typography color="text.secondary" variant="overline">References</Typography><Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap', mt: 1 }}>{exercise.references.map((reference) => <Chip key={reference.id} label={reference.title} />)}</Stack></Box>
-                    <Box><Typography color="text.secondary" variant="overline">Objectives</Typography><Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap', mt: 1 }}>{exercise.objectives.map((objective) => <Chip key={objective.id} label={objective.title} />)}</Stack></Box>
-                  </Stack>
-                  <Stack spacing={3}>
-                    <Box><Typography color="text.secondary" variant="overline">Schedule</Typography><Typography>{new Date(exercise.scheduled_start_time).toLocaleString()} – {new Date(exercise.scheduled_end_time).toLocaleString()}</Typography></Box>
-                    <Box><Typography color="text.secondary" variant="overline">Scenario</Typography><Typography>{exercise.scenario}</Typography></Box>
-                  </Stack>
-                </Box>
-              )}
               {tab === 1 && (
                 <Stack spacing={2} sx={{ pt: 3 }}>
-                  <Button onClick={() => openEventForm()} startIcon={<AddIcon />} sx={{ alignSelf: 'flex-start' }} variant="contained">Add event</Button>
-                  {exercise.events.length === 0 ? <Paper sx={{ p: 4, textAlign: 'center' }} variant="outlined">No events have been added.</Paper> : exercise.events.map((event) => (
-                    <Paper key={event.id} sx={{ overflow: 'hidden' }} variant="outlined">
+                  {participantError && <Alert onClose={() => setParticipantError(null)} severity="error">{participantError}</Alert>}
+                  <Button onClick={() => void openParticipantForm()} startIcon={<AddIcon />} sx={{ alignSelf: 'flex-end' }} variant="contained">Add participant</Button>
+                  <TableContainer component={Paper} variant="outlined">
+                    <Table>
+                      <TableHead><TableRow><TableCell>Name</TableCell><TableCell>Role</TableCell><TableCell>Email</TableCell><TableCell /></TableRow></TableHead>
+                      <TableBody>
+                        {exercise.participants.map((participant) => <TableRow key={participant.id}>
+                          <TableCell>{participant.first_name} {participant.last_name}</TableCell>
+                          <TableCell><Box sx={{ display: 'inline-grid', maxWidth: '100%', '& > *': { gridArea: '1 / 1' } }}>
+                            {Object.values(participantRoleLabels).map((label) => <Box aria-hidden key={label} sx={{ visibility: 'hidden', whiteSpace: 'nowrap', pl: '14px', pr: '32px' }}>{label}</Box>)}
+                            <Select disabled={updatingParticipantId !== null} inputProps={{ 'aria-label': `Role for ${participant.first_name} ${participant.last_name}` }} onChange={(event) => void updateParticipantRole(participant, event.target.value as ParticipantRole)} size="small" sx={{ '& .MuiOutlinedInput-notchedOutline': { border: 0 }, '& .MuiSelect-select:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: -2 } }} value={participant.role}>{(Object.keys(participantRoleLabels) as ParticipantRole[]).map((role) => <MenuItem key={role} value={role}>{participantRoleLabels[role]}</MenuItem>)}</Select>
+                          </Box></TableCell>
+                          <TableCell>{participant.email || '—'}</TableCell>
+                          <TableCell><IconButton aria-label={`Remove ${participant.first_name} ${participant.last_name}`} color="error" onClick={() => void deleteParticipant(participant)}><DeleteIcon /></IconButton></TableCell>
+                        </TableRow>)}
+                        {exercise.participants.length === 0 && <TableRow><TableCell colSpan={4}>No participants have been added.</TableCell></TableRow>}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </Stack>
+              )}
+              {tab === 2 && (
+                <Stack spacing={2} sx={{ pt: 3 }}>
+                  <Button onClick={() => openEventForm()} startIcon={<AddIcon />} sx={{ alignSelf: 'flex-end' }} variant="contained">Add event</Button>
+                  {exercise.events.length === 0 ? <Paper sx={{ p: 4, textAlign: 'center' }} variant="outlined">No events have been added.</Paper> : exercise.events.map((event, index) => (
+                    <Paper variant="outlined" key={event.id} sx={{ overflow: 'hidden' }}>
                       <Stack direction="row" spacing={2} sx={{ alignItems: 'center', p: 2 }}>
-                        <Typography variant="h6">Event {event.number}: {event.description}</Typography>
-                        <Stack direction="row" spacing={1} sx={{ flexGrow: 1 }}>{event.objectives.map((objective) => <Chip key={objective.id} label={objective.title} size="small" />)}</Stack>
-                        <Button onClick={() => openInjectForm(event)} startIcon={<AddIcon />}>Add inject</Button>
+                        <Typography variant="h6">Event {event.number}</Typography>
+                        <Box sx={{ flexGrow: 1 }} />
+                        <IconButton aria-label={`Move event ${event.number} up`} disabled={reordering || index === 0} onClick={() => void reorderEvents(event.id, index - 1)} size="small"><ArrowUpwardIcon /></IconButton>
+                        <IconButton aria-label={`Move event ${event.number} down`} disabled={reordering || index === exercise.events.length - 1} onClick={() => void reorderEvents(event.id, index + 1)} size="small"><ArrowDownwardIcon /></IconButton>
                         <IconButton aria-label={`Edit event ${event.number}`} onClick={() => openEventForm(event)}><EditIcon /></IconButton>
                         <IconButton aria-label={`Delete event ${event.number}`} color="error" onClick={() => void deleteEvent(event)}><DeleteIcon /></IconButton>
                       </Stack>
-                      <TableContainer>
+                      <Typography sx={{ px: 2, pb: 2 }}>{event.description}</Typography>
+                      <TableContainer sx={{ border: 0, borderRadius: 0, '& tbody tr:last-child td': { borderBottom: 0 } }}>
                         <Table size="small">
                           <TableHead><TableRow><TableCell>Inject</TableCell><TableCell>Scheduled</TableCell><TableCell>Method</TableCell><TableCell>From</TableCell><TableCell>To</TableCell><TableCell>Message</TableCell><TableCell /></TableRow></TableHead>
                           <TableBody>
@@ -382,11 +558,27 @@ export function ExerciseWorkspace({ exerciseId, onClose, onEdit }: ExerciseWorks
             </>
           ) : null}
         </DialogContent>
-        <DialogActions><Button onClick={onClose}>Close</Button>{exercise && <Button onClick={onEdit} startIcon={<EditIcon />} variant="contained">Edit exercise</Button>}</DialogActions>
+        <DialogActions sx={{ justifyContent: 'flex-start' }}><Button color="inherit" onClick={onClose}>Cancel</Button></DialogActions>
+          </>
+        )}
+      </Dialog>
+
+      <Dialog fullWidth maxWidth="sm" onClose={() => !saving && setParticipantFormOpen(false)} open={participantFormOpen}>
+        <Box component="form" onSubmit={saveParticipant}>
+          <DialogTitle>Add participant</DialogTitle>
+          <DialogContent>
+            <Stack spacing={2} sx={{ pt: 1 }}>
+              {participantError && <Alert severity="error">{participantError}</Alert>}
+              <FormControl required><InputLabel id="participant-name-label">Name</InputLabel><Select disabled={loadingUsers} label="Name" labelId="participant-name-label" onChange={(event) => setParticipantForm((current) => ({ ...current, username: event.target.value }))} value={participantForm.username}>{users.map((user) => <MenuItem key={user.username} value={user.username}>{user.last_name && user.first_name ? `${user.last_name}, ${user.first_name}` : user.display_name}</MenuItem>)}</Select></FormControl>
+              <FormControl><InputLabel id="participant-role-label">Role</InputLabel><Select label="Role" labelId="participant-role-label" onChange={(event) => setParticipantForm((current) => ({ ...current, role: event.target.value as ParticipantRole }))} value={participantForm.role}>{(Object.keys(participantRoleLabels) as ParticipantRole[]).map((role) => <MenuItem key={role} value={role}>{participantRoleLabels[role]}</MenuItem>)}</Select></FormControl>
+            </Stack>
+          </DialogContent>
+          <DialogActions sx={{ justifyContent: 'flex-start' }}><Button disabled={saving || loadingUsers} type="submit" variant="contained">Save</Button><Button color="inherit" disabled={saving} onClick={() => setParticipantFormOpen(false)}>Cancel</Button></DialogActions>
+        </Box>
       </Dialog>
 
       <Dialog fullWidth maxWidth="sm" onClose={() => setEventFormOpen(false)} open={eventFormOpen}>
-        <Box component="form" onSubmit={saveEvent}><DialogTitle>{editingEvent ? 'Edit event' : 'Add event'}</DialogTitle><DialogContent><Stack spacing={2} sx={{ pt: 1 }}>{formError && <Alert severity="error">{formError}</Alert>}<TextField label="Event number" onChange={(event) => setEventForm((form) => ({ ...form, number: event.target.value }))} required type="number" value={eventForm.number} /><TextField label="Description" onChange={(event) => setEventForm((form) => ({ ...form, description: event.target.value }))} required value={eventForm.description} /><FormControl><InputLabel id="event-objectives-label">Objectives</InputLabel><Select label="Objectives" labelId="event-objectives-label" multiple onChange={(event) => {
+        <Box component="form" onSubmit={saveEvent}><DialogTitle>{editingEvent ? 'Edit event' : 'Add event'}</DialogTitle><DialogContent><Stack spacing={2} sx={{ pt: 1 }}>{formError && <Alert severity="error">{formError}</Alert>}{editingEvent && <TextField label="Event number" onChange={(event) => setEventForm((form) => ({ ...form, number: event.target.value }))} required type="number" value={eventForm.number} />}<TextField label="Description" onChange={(event) => setEventForm((form) => ({ ...form, description: event.target.value }))} required value={eventForm.description} /><FormControl><InputLabel id="event-objectives-label">Objectives</InputLabel><Select label="Objectives" labelId="event-objectives-label" multiple onChange={(event) => {
           const value = event.target.value
           const selectedValues = typeof value === 'string' ? value.split(',') : value
           if (selectedValues.includes(createObjectiveValue)) {
@@ -408,7 +600,16 @@ export function ExerciseWorkspace({ exerciseId, onClose, onEdit }: ExerciseWorks
           <MenuItem value={createObjectiveValue}><AddIcon fontSize="small" sx={{ mr: 1 }} />Create objective</MenuItem>
           {exercise?.objectives.map((objective) => <MenuItem key={objective.id} value={objective.id}><Checkbox checked={eventForm.objectiveIds.includes(objective.id)} /><ListItemText primary={objective.title} secondary={objective.description} /></MenuItem>)}
           {eventForm.newObjectives.map((objective) => <MenuItem key={objective.clientId} value={`${newObjectiveValuePrefix}${objective.clientId}`}><Checkbox checked /><ListItemText primary={objective.title} secondary={`${objective.description} (new)`} /></MenuItem>)}
-        </Select></FormControl></Stack></DialogContent><DialogActions><Button disabled={saving} type="submit" variant="contained">{saving ? 'Saving…' : 'Save'}</Button><Button onClick={() => setEventFormOpen(false)}>Cancel</Button></DialogActions></Box>
+        </Select></FormControl>
+          <Box>
+            <Typography sx={{ mb: 1 }}>Injects</Typography>
+            <Stack spacing={1}>
+              {editingEvent?.injects.map((inject) => <Typography key={inject.id} variant="body2">{inject.number}: {inject.message}</Typography>)}
+              {newInjects.map((inject) => <Chip key={inject.clientId} label={`${inject.number}: ${inject.message} (new)`} onDelete={() => setNewInjects((current) => current.filter((item) => item.clientId !== inject.clientId))} />)}
+              <Button onClick={() => openInjectForm(editingEvent)} startIcon={<AddIcon />} sx={{ alignSelf: 'flex-start' }}>Add inject</Button>
+            </Stack>
+          </Box>
+        </Stack></DialogContent><DialogActions><Button disabled={saving} type="submit" variant="contained">{saving ? 'Saving…' : 'Save'}</Button><Button onClick={() => setEventFormOpen(false)}>Cancel</Button></DialogActions></Box>
       </Dialog>
 
       <Dialog fullWidth maxWidth="sm" onClose={() => setNewObjectiveDialogOpen(false)} open={newObjectiveDialogOpen}>
@@ -425,7 +626,7 @@ export function ExerciseWorkspace({ exerciseId, onClose, onEdit }: ExerciseWorks
       </Dialog>
 
       <Dialog fullWidth maxWidth="md" onClose={() => setInjectFormOpen(false)} open={injectFormOpen}>
-        <Box component="form" onSubmit={saveInject}><DialogTitle>{editingInject ? 'Edit inject' : 'Add inject'}</DialogTitle><DialogContent><Stack spacing={2} sx={{ pt: 1 }}>{formError && <Alert severity="error">{formError}</Alert>}<Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}><TextField fullWidth label="Inject number" onChange={(event) => setInjectForm((form) => ({ ...form, number: event.target.value }))} required value={injectForm.number} /><TextField fullWidth label="Scheduled start" onChange={(event) => setInjectForm((form) => ({ ...form, scheduledStartTime: event.target.value }))} required slotProps={{ inputLabel: { shrink: true } }} type="datetime-local" value={injectForm.scheduledStartTime} /></Stack><FormControl><InputLabel id="delivery-method-label">Delivery method</InputLabel><Select label="Delivery method" labelId="delivery-method-label" onChange={(event) => setInjectForm((form) => ({ ...form, deliveryMethod: event.target.value as DeliveryMethod }))} value={injectForm.deliveryMethod}>{(Object.keys(deliveryMethodLabels) as DeliveryMethod[]).map((method) => <MenuItem key={method} value={method}>{deliveryMethodLabels[method]}</MenuItem>)}</Select></FormControl><FormControl required><InputLabel id="sender-label">From</InputLabel><Select label="From" labelId="sender-label" onChange={(event) => setInjectForm((form) => ({ ...form, sender: event.target.value as InjectRole }))} value={injectForm.sender}>{(Object.keys(injectRoleLabels) as InjectRole[]).map((role) => <MenuItem key={role} value={role}>{injectRoleLabels[role]}</MenuItem>)}</Select></FormControl><FormControl required><InputLabel id="recipient-label">To</InputLabel><Select label="To" labelId="recipient-label" onChange={(event) => setInjectForm((form) => ({ ...form, recipient: event.target.value as InjectRole }))} value={injectForm.recipient}>{(Object.keys(injectRoleLabels) as InjectRole[]).map((role) => <MenuItem key={role} value={role}>{injectRoleLabels[role]}</MenuItem>)}</Select></FormControl><TextField label="Message" minRows={4} multiline onChange={(event) => setInjectForm((form) => ({ ...form, message: event.target.value }))} required value={injectForm.message} /><TextField label="Expected response" minRows={3} multiline onChange={(event) => setInjectForm((form) => ({ ...form, expectedResponse: event.target.value }))} value={injectForm.expectedResponse} /></Stack></DialogContent><DialogActions><Button disabled={saving} type="submit" variant="contained">{saving ? 'Saving…' : 'Save'}</Button><Button onClick={() => setInjectFormOpen(false)}>Cancel</Button></DialogActions></Box>
+        <Box component="form" onSubmit={saveInject}><DialogTitle>{editingInject ? 'Edit inject' : 'Add inject'}</DialogTitle><DialogContent><Stack spacing={2} sx={{ pt: 1 }}>{injectError && <Alert severity="error">{injectError}</Alert>}<Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}><TextField fullWidth label="Inject number" onChange={(event) => setInjectForm((form) => ({ ...form, number: event.target.value }))} required value={injectForm.number} /><TextField fullWidth label="Scheduled start" onChange={(event) => setInjectForm((form) => ({ ...form, scheduledStartTime: event.target.value }))} required slotProps={{ inputLabel: { shrink: true } }} type="datetime-local" value={injectForm.scheduledStartTime} /></Stack><FormControl><InputLabel id="delivery-method-label">Delivery method</InputLabel><Select label="Delivery method" labelId="delivery-method-label" onChange={(event) => setInjectForm((form) => ({ ...form, deliveryMethod: event.target.value as DeliveryMethod }))} value={injectForm.deliveryMethod}>{(Object.keys(deliveryMethodLabels) as DeliveryMethod[]).map((method) => <MenuItem key={method} value={method}>{deliveryMethodLabels[method]}</MenuItem>)}</Select></FormControl><FormControl required><InputLabel id="sender-label">From</InputLabel><Select label="From" labelId="sender-label" onChange={(event) => setInjectForm((form) => ({ ...form, sender: event.target.value as InjectRole }))} value={injectForm.sender}>{(Object.keys(injectRoleLabels) as InjectRole[]).map((role) => <MenuItem key={role} value={role}>{injectRoleLabels[role]}</MenuItem>)}</Select></FormControl><FormControl required><InputLabel id="recipient-label">To</InputLabel><Select label="To" labelId="recipient-label" onChange={(event) => setInjectForm((form) => ({ ...form, recipient: event.target.value as InjectRole }))} value={injectForm.recipient}>{(Object.keys(injectRoleLabels) as InjectRole[]).map((role) => <MenuItem key={role} value={role}>{injectRoleLabels[role]}</MenuItem>)}</Select></FormControl><TextField label="Message" minRows={4} multiline onChange={(event) => setInjectForm((form) => ({ ...form, message: event.target.value }))} required value={injectForm.message} /><TextField label="Expected response" minRows={3} multiline onChange={(event) => setInjectForm((form) => ({ ...form, expectedResponse: event.target.value }))} value={injectForm.expectedResponse} /></Stack></DialogContent><DialogActions><Button disabled={saving} type="submit" variant="contained">{saving ? 'Saving…' : 'Save'}</Button><Button onClick={() => setInjectFormOpen(false)}>Cancel</Button></DialogActions></Box>
       </Dialog>
     </>
   )

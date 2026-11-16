@@ -140,7 +140,14 @@ class EventCreateSchema(Schema):
     number: int
     description: str
     new_objectives: list[ObjectiveCreateSchema] = Field(default_factory=list)
+    new_injects: list[InjectCreateSchema] = Field(default_factory=list)
     objective_ids: list[UUID]
+
+
+class EventOrderSchema(Schema):
+    """The event IDs in display order."""
+
+    event_ids: list[UUID]
 
 
 class EventUpdateSchema(Schema):
@@ -149,6 +156,7 @@ class EventUpdateSchema(Schema):
     number: int | None = None
     description: str | None = None
     new_objectives: list[ObjectiveCreateSchema] | None = None
+    new_injects: list[InjectCreateSchema] | None = None
     objective_ids: list[UUID] | None = None
     started_at: datetime | None = None
     ended_at: datetime | None = None
@@ -197,6 +205,8 @@ class ExerciseSchema(Schema):
     scheduled_end_time: datetime
     started_at: datetime | None
     ended_at: datetime | None
+    facilitator_id: UUID | None
+    assistant_facilitator_ids: list[UUID]
     participants: list[ParticipantSchema]
     references: list[ReferenceSchema]
     objectives: list[ObjectiveSchema]
@@ -210,6 +220,15 @@ class ExerciseSchema(Schema):
     findings: list[FindingSchema]
 
 
+class ParticipantSummarySchema(Schema):
+    """The participant fields displayed on an exercise card."""
+
+    id: UUID
+    first_name: str
+    last_name: str
+    role: Participant.Role
+
+
 class ExerciseListSchema(Schema):
     """The abbreviated fields of an Exercise."""
 
@@ -218,6 +237,9 @@ class ExerciseListSchema(Schema):
     updated_by: ExerciseUserSchema
     scheduled_start_time: datetime
     scheduled_end_time: datetime
+    facilitator_id: UUID | None
+    assistant_facilitator_ids: list[UUID]
+    participants: list[ParticipantSummarySchema]
     objectives: list[ObjectiveSchema]
     references: list[ReferenceSchema]
     scenario: str
@@ -249,6 +271,8 @@ class ExerciseUpdateSchema(Schema):
     reference_ids: list[UUID] | None = None
     objective_ids: list[UUID] | None = None
     facilitator_username: str | None = None
+    facilitator_id: UUID | None = None
+    assistant_facilitator_ids: list[UUID] | None = None
     type: Exercise.Type | None = None
     scheduled_start_time: datetime | None = None
     scheduled_end_time: datetime | None = None

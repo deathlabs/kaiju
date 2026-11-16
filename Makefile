@@ -85,20 +85,6 @@ design-lint-json:
 .SILENT: dev
 
 dev:
-	echo "[*] Starting $(APP)'s database"
-	docker compose --profile database up -d --wait
-
-	echo "[*] Applying $(APP)'s database migrations"
-	cd "$(BACKEND_BUILD_CONTEXT)" && \
-	source .env.example && \
-	export PGHOST=localhost && \
-	unset VIRTUAL_ENV && \
-	cd kaiju && \
-	uv run python manage.py migrate && \
-	echo "[*] Seeding $(APP)'s local development data" && \
-	uv run python manage.py seed
-
-	echo "[*] Starting $(APP)'s backend and frontend"
 	APP="$(APP)" \
 	AUTH_AUDIENCE="$(AUTH_AUDIENCE)" \
 	AUTH_ISSUER="$(AUTH_ISSUER)" \
@@ -260,6 +246,15 @@ start: dependency-scan
 
 stop: 
 	docker compose --profile $(DOCKER_COMPOSE_PROFILE) down
+
+# ---------------------------------------------------------
+# Remove the database container, volume, and local files.
+# ---------------------------------------------------------
+
+.PHONY: clean
+.SILENT: clean
+clean:
+	scripts/clean.sh
 
 # ---------------------------------------------------------
 # Check the status of the containers.

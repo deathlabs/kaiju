@@ -389,13 +389,44 @@ class AuthenticationTests(TestCase):
             )
 
         self.assertEqual(response.status_code, 200)
-        facilitator = Participant.objects.get(
-            exercise_id=exercise_id,
-            role=Participant.Role.FACILITATOR,
-        )
+        facilitator = Exercise.objects.get(id=exercise_id).facilitator
         self.assertEqual(facilitator.first_name, "Grace")
         self.assertEqual(facilitator.last_name, "Hopper")
         self.assertEqual(facilitator.email, "grace@example.com")
+
+    def test_facilitator_assignments_and_primary_protection(self):
+        exercise_id = self._create_exercise().json()["id"]
+        exercise = Exercise.objects.get(id=exercise_id)
+        original_id = str(exercise.facilitator_id)
+        assistant = Participant.objects.create(
+            exercise=exercise, first_name="Grace", last_name="Hopper",
+            role=Participant.Role.FACILITATOR,
+        )
+        with self._settings():
+            response = self.client.patch(
+                f"/api/v1/exercises/{exercise_id}/",
+                data=json.dumps({"facilitator_id": str(assistant.id),
+                                 "assistant_facilitator_ids": [original_id]}),
+                content_type="application/json",
+                **self._authorization(self._token()),
+            )
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json()["facilitator_id"], str(assistant.id))
+            self.assertEqual(response.json()["assistant_facilitator_ids"], [original_id])
+            rejected = self.client.delete(
+                f"/api/v1/exercises/{exercise_id}/participants/{assistant.id}/",
+                **self._authorization(self._token()),
+            )
+            self.assertEqual(rejected.status_code, 400)
+            invalid = self.client.patch(
+                f"/api/v1/exercises/{exercise_id}/",
+                data=json.dumps({"assistant_facilitator_ids": [str(assistant.id)]}),
+                content_type="application/json",
+                **self._authorization(self._token()),
+            )
+            self.assertEqual(invalid.status_code, 400)
+            exercise.refresh_from_db()
+            self.assertEqual(exercise.facilitator_id, assistant.id)
 
     def test_exercise_creation_attaches_objectives(self):
         objective = Objective.objects.create(
@@ -447,6 +478,10 @@ class AuthenticationTests(TestCase):
         self.assertEqual(response.json()[0]["references"][0]["id"], str(reference.id))
         self.assertEqual(references_response.status_code, 200)
         self.assertEqual(references_response.json()[0]["exercise_count"], 1)
+        self.assertEqual(
+            references_response.json()[0]["exercises"][0]["title"],
+            "Incident response exercise",
+        )
         self.assertEqual(objectives_response.status_code, 200)
         self.assertEqual(objectives_response.json()[0]["exercise_count"], 1)
         self.assertEqual(
@@ -662,6 +697,86 @@ class AuthenticationTests(TestCase):
         exercise = Exercise.objects.get(id=exercise_id)
         self.assertEqual(exercise.title, "Incident response exercise")
         self.assertEqual(exercise.references.count(), 0)
+
+    def test_exercise_list_includes_facilitator_and_participants(self):
+        exercise_id = self._create_exercise().json()["id"]
+        Participant.objects.create(
+            exercise_id=exercise_id,
+            first_name="Mothra",
+            last_name="Mosura",
+            role=Participant.Role.USER,
+        )
+        with self._settings():
+            response = self.client.get(
+                "/api/v1/exercises/", **self._authorization(self._token())
+            )
+
+        self.assertEqual(response.status_code, 200)
+        participants = response.json()[0]["participants"]
+        self.assertCountEqual(
+            [(person["first_name"], person["last_name"], person["role"]) for person in participants],
+            [("Vic", "Fernandez III", "facilitator"), ("Mothra", "Mosura", "user")],
+        )
+
+    def test_event_saves_new_injects_and_rejects_duplicate_numbers(self):
+        exercise_id = self._create_exercise().json()["id"]
+        inject = {
+            "number": "1A",
+            "scheduled_start_time": "2026-11-16T13:00:00Z",
+            "delivery_method": "email",
+            "sender": "cybersecurity_service_provider",
+            "recipient": "user",
+            "message": "Investigate the alert.",
+        }
+        with self._settings():
+            authorization = self._authorization(self._token())
+            response = self.client.post(
+                f"/api/v1/exercises/{exercise_id}/events/",
+                data=json.dumps({"number": 1, "description": "Initial event", "objective_ids": [], "new_injects": [inject]}),
+                content_type="application/json", **authorization,
+            )
+            self.assertEqual(response.status_code, 201)
+            event_id = response.json()["id"]
+            self.assertEqual(response.json()["injects"][0]["number"], "1A")
+            url = f"/api/v1/exercises/{exercise_id}/events/{event_id}/"
+            response = self.client.patch(
+                url, data=json.dumps({"description": "Updated", "new_injects": [inject]}),
+                content_type="application/json", **authorization,
+            )
+            self.assertEqual(response.status_code, 400)
+            self.assertEqual(Event.objects.get(id=event_id).description, "Initial event")
+            self.assertEqual(Inject.objects.filter(event_id=event_id).count(), 1)
+            inject["number"] = "1B"
+            response = self.client.patch(
+                url, data=json.dumps({"description": "Updated", "new_injects": [inject]}),
+                content_type="application/json", **authorization,
+            )
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(Inject.objects.filter(event_id=event_id).count(), 2)
+
+    def test_event_order_is_saved_and_invalid_orders_are_rejected(self):
+        with self._settings():
+            authorization = self._authorization(self._token())
+            exercise_id = self._create_exercise().json()["id"]
+            events = [
+                Event.objects.create(exercise_id=exercise_id, number=number, description=str(number))
+                for number in (1, 2, 3)
+            ]
+            url = f"/api/v1/exercises/{exercise_id}/events/order/"
+            event_ids = [str(event.id) for event in reversed(events)]
+            response = self.client.put(
+                url, data=json.dumps({"event_ids": event_ids}),
+                content_type="application/json", **authorization,
+            )
+            self.assertEqual(response.status_code, 204)
+            response = self.client.get(f"/api/v1/exercises/{exercise_id}/", **authorization)
+            self.assertEqual([event["id"] for event in response.json()["events"]], event_ids)
+            response = self.client.put(
+                url, data=json.dumps({"event_ids": [event_ids[0]] * 3}),
+                content_type="application/json", **authorization,
+            )
+            self.assertEqual(response.status_code, 400)
+            self.assertEqual(list(Event.objects.values_list("id", flat=True)), [event.id for event in reversed(events)])
 
     def test_event_creation_rejects_objectives_outside_exercise(self):
         exercise_objective = Objective.objects.create(

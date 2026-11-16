@@ -1,4 +1,5 @@
 import AddIcon from '@mui/icons-material/Add'
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth'
 import SearchIcon from '@mui/icons-material/Search'
 import Alert from '@mui/material/Alert'
 import Box from '@mui/material/Box'
@@ -27,11 +28,28 @@ import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 
+interface ReferenceExercise {
+  id: string
+  title: string
+}
+
+type ExerciseType = 'discussion' | 'discussion_and_hands_on'
+type ExerciseStatus = 'planned' | 'prepared' | 'in_progress' | 'completed'
+
+interface ExerciseDetails extends ReferenceExercise {
+  scheduled_start_time: string
+  scheduled_end_time: string
+  scenario: string
+  status: ExerciseStatus
+  type: ExerciseType
+}
+
 type ReferenceType = 'policy' | 'standard' | 'procedure' | 'guideline'
 
 interface Reference {
   id: string
   exercise_count: number
+  exercises?: ReferenceExercise[]
   type: ReferenceType
   title: string
   url: string
@@ -46,12 +64,25 @@ interface ReferenceForm {
 }
 
 const referencesUrl = '/api/v1/references/'
+const exercisesUrl = '/api/v1/exercises/'
 const emptyForm: ReferenceForm = { type: '', title: '', url: '' }
 const typeLabels: Record<ReferenceType, string> = {
   policy: 'Policy',
   standard: 'Standard',
   procedure: 'Procedure',
   guideline: 'Guideline',
+}
+
+const exerciseTypeLabels: Record<ExerciseType, string> = {
+  discussion: 'Discussion',
+  discussion_and_hands_on: 'Discussion and Hands-On',
+}
+
+const statusLabels: Record<ExerciseStatus, string> = {
+  planned: 'Planned',
+  prepared: 'Prepared',
+  in_progress: 'In progress',
+  completed: 'Completed',
 }
 
 const getErrorMessage = async (response: Response) => {
@@ -65,6 +96,19 @@ const getErrorMessage = async (response: Response) => {
   }
 
   return `The request failed with status ${response.status}.`
+}
+
+const formatSchedule = (start: string, end: string) => {
+  const startDate = new Date(start)
+  const endDate = new Date(end)
+  const date = new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+  }).format(startDate)
+  const time = new Intl.DateTimeFormat(undefined, {
+    timeStyle: 'short',
+  })
+
+  return `${date}, ${time.format(startDate)}–${time.format(endDate)}`
 }
 
 export function ReferencesPage() {
@@ -83,6 +127,14 @@ export function ReferencesPage() {
   const [deletingReference, setDeletingReference] =
     useState<Reference | null>(null)
   const [deleting, setDeleting] = useState(false)
+
+  const [selectedExercise, setSelectedExercise] =
+    useState<ExerciseDetails | null>(null)
+  const [exerciseDetailsOpen, setExerciseDetailsOpen] = useState(false)
+  const [exerciseDetailsLoading, setExerciseDetailsLoading] = useState(false)
+  const [exerciseDetailsError, setExerciseDetailsError] = useState<string | null>(
+    null,
+  )
 
   const loadReferences = useCallback(async (signal?: AbortSignal) => {
     setLoading(true)
@@ -142,6 +194,33 @@ export function ReferencesPage() {
 
     setDeletingReference(null)
     setFormOpen(true)
+  }
+
+  const openExerciseDetails = async (exercise: ReferenceExercise) => {
+    setSelectedExercise(null)
+    setExerciseDetailsError(null)
+    setExerciseDetailsLoading(true)
+    setExerciseDetailsOpen(true)
+
+    try {
+      const response = await fetch(`${exercisesUrl}${exercise.id}/`)
+
+      if (!response.ok) throw new Error(await getErrorMessage(response))
+
+      setSelectedExercise((await response.json()) as ExerciseDetails)
+    } catch (error) {
+      setExerciseDetailsError(
+        error instanceof Error
+          ? error.message
+          : 'Could not load the exercise.',
+      )
+    } finally {
+      setExerciseDetailsLoading(false)
+    }
+  }
+
+  const closeExerciseDetails = () => {
+    if (!exerciseDetailsLoading) setExerciseDetailsOpen(false)
   }
 
   const saveReference = async (event: FormEvent<HTMLFormElement>) => {
@@ -446,6 +525,41 @@ export function ReferencesPage() {
               type="url"
               value={form.url}
             />
+            {editingReference && (
+              <Box sx={{ mt: 2 }}>
+                <Typography
+                  color="text.secondary"
+                  component="h3"
+                  sx={{ mb: 1 }}
+                  variant="caption"
+                >
+                  Related exercises
+                </Typography>
+                {editingReference.exercises &&
+                editingReference.exercises.length > 0 ? (
+                  <Stack spacing={1}>
+                    {editingReference.exercises.map((exercise) => (
+                      <Card key={exercise.id} variant="outlined">
+                        <CardActionArea
+                          aria-label={`View ${exercise.title}`}
+                          onClick={() => void openExerciseDetails(exercise)}
+                        >
+                          <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+                            <Typography variant="body2">
+                              {exercise.title}
+                            </Typography>
+                          </CardContent>
+                        </CardActionArea>
+                      </Card>
+                    ))}
+                  </Stack>
+                ) : (
+                  <Typography color="text.secondary" variant="body2">
+                    None
+                  </Typography>
+                )}
+              </Box>
+            )}
           </DialogContent>
           <DialogActions
             sx={{
@@ -472,6 +586,73 @@ export function ReferencesPage() {
             )}
           </DialogActions>
         </Box>
+      </Dialog>
+
+      <Dialog
+        fullWidth
+        maxWidth="sm"
+        onClose={closeExerciseDetails}
+        open={exerciseDetailsOpen}
+      >
+        <DialogTitle>Exercise information</DialogTitle>
+        <DialogContent>
+          {exerciseDetailsLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress aria-label="Loading exercise information" />
+            </Box>
+          ) : exerciseDetailsError ? (
+            <Alert severity="error">{exerciseDetailsError}</Alert>
+          ) : selectedExercise ? (
+            <Stack spacing={2}>
+              <Box>
+                <Stack direction="row" spacing={1} sx={{ mb: 1.5 }}>
+                  <Chip
+                    label={statusLabels[selectedExercise.status]}
+                    size="small"
+                  />
+                  <Chip
+                    label={exerciseTypeLabels[selectedExercise.type]}
+                    size="small"
+                    variant="outlined"
+                  />
+                </Stack>
+                <Typography component="h3" variant="h6">
+                  {selectedExercise.title}
+                </Typography>
+              </Box>
+              <Stack
+                direction="row"
+                spacing={1}
+                sx={{ alignItems: 'center', color: 'text.secondary' }}
+              >
+                <CalendarMonthIcon fontSize="small" />
+                <Typography variant="body2">
+                  {formatSchedule(
+                    selectedExercise.scheduled_start_time,
+                    selectedExercise.scheduled_end_time,
+                  )}
+                </Typography>
+              </Stack>
+              <Box>
+                <Typography component="h4" gutterBottom variant="subtitle2">
+                  Scenario
+                </Typography>
+                <Typography color="text.secondary" variant="body2">
+                  {selectedExercise.scenario}
+                </Typography>
+              </Box>
+            </Stack>
+          ) : null}
+        </DialogContent>
+        <DialogActions>
+          <Button
+            color="inherit"
+            disabled={exerciseDetailsLoading}
+            onClick={closeExerciseDetails}
+          >
+            Close
+          </Button>
+        </DialogActions>
       </Dialog>
 
       <Dialog

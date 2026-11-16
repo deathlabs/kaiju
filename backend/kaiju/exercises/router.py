@@ -4,7 +4,7 @@ from uuid import UUID
 # Third party imports.
 from django.contrib.auth import get_user_model
 from django.db import transaction
-from django.db.models import QuerySet
+from django.db.models import Max, QuerySet
 from ninja import Router, Status
 
 # Local imports.
@@ -20,6 +20,7 @@ from exercises.schemas import (
     AfterActionReportSchema,
     BadRequestResponseSchema,
     EventCreateSchema,
+    EventOrderSchema,
     EventSchema,
     EventUpdateSchema,
     ExerciseCreateSchema,
@@ -140,13 +141,16 @@ def create_exercise(request, payload: ExerciseCreateSchema):
     exercise.objectives.set(objectives)
     exercise.references.set(references)
 
-    Participant.objects.create(
+    participant = Participant.objects.create(
         exercise=exercise,
         first_name=facilitator.first_name,
         last_name=facilitator.last_name,
         email=facilitator.email or None,
         role=Participant.Role.FACILITATOR,
     )
+
+    exercise.facilitator = participant
+    exercise.save(update_fields=["facilitator"])
 
     return Status(201, exercise)
 
@@ -158,6 +162,7 @@ def list_exercises(request):
         200,
         Exercise.objects.select_related("created_by", "updated_by").prefetch_related(
             "objectives",
+            "participants",
             "references",
         ),
     )
@@ -195,7 +200,7 @@ def get_exercise(request, exercise_id: UUID):
 def update_exercise(request, exercise_id: UUID, payload: ExerciseUpdateSchema):
     """Update an exercise."""
     try:
-        exercise = Exercise.objects.get(id=exercise_id)
+        exercise = Exercise.objects.select_for_update().get(id=exercise_id)
     except Exercise.DoesNotExist:
         return Status(404, {"message": "Exercise not found"})
 
@@ -206,6 +211,29 @@ def update_exercise(request, exercise_id: UUID, payload: ExerciseUpdateSchema):
     reference_ids = data.pop("reference_ids", None)
     objective_ids = data.pop("objective_ids", None)
     facilitator_username = data.pop("facilitator_username", None)
+    facilitator_id = data.pop("facilitator_id", None)
+    assistant_ids = data.pop("assistant_facilitator_ids", None)
+    if "facilitator_id" in payload.model_fields_set and facilitator_id is None:
+        return Status(400, {"message": "An exercise must have a facilitator"})
+    if facilitator_username is not None and assistant_ids is not None:
+        return Status(400, {"message": "Use facilitator IDs when setting assistants"})
+    if facilitator_id is not None and facilitator_username is not None:
+        return Status(400, {"message": "Select a facilitator using one identifier"})
+    if assistant_ids is not None:
+        if len(assistant_ids) != len(set(assistant_ids)):
+            return Status(400, {"message": "Assistant facilitator IDs must be unique"})
+        if (facilitator_id or exercise.facilitator_id) in assistant_ids:
+            return Status(400, {"message": "The facilitator cannot also be an assistant"})
+    selected_ids = set(assistant_ids or [])
+    if facilitator_id is not None:
+        selected_ids.add(facilitator_id)
+    participants = {participant.id: participant for participant in exercise.participants.filter(id__in=selected_ids)}
+    if len(participants) != len(selected_ids):
+        return Status(400, {"message": "Facilitators must belong to the exercise"})
+    if facilitator_id is not None and participants[facilitator_id].role != Participant.Role.FACILITATOR:
+        return Status(400, {"message": "The selected participant must be a facilitator"})
+    if assistant_ids is not None and any(participants[item].role != Participant.Role.FACILITATOR for item in assistant_ids):
+        return Status(400, {"message": "Assistant facilitators must have the facilitator role"})
 
     facilitator = None
     if facilitator_username is not None:
@@ -271,6 +299,9 @@ def update_exercise(request, exercise_id: UUID, payload: ExerciseUpdateSchema):
             for reference_data in new_reference_data
         )
 
+    if facilitator_id is not None:
+        exercise.facilitator_id = facilitator_id
+
     for field, value in data.items():
         setattr(exercise, field, value)
 
@@ -284,28 +315,21 @@ def update_exercise(request, exercise_id: UUID, payload: ExerciseUpdateSchema):
         exercise.references.set(references)
 
     if facilitator is not None:
-        current_facilitator = (
-            exercise.participants.filter(
-                role=Participant.Role.FACILITATOR,
-            )
-            .order_by("created_at")
-            .first()
-        )
-        selected_participant = exercise.participants.filter(
-            email=facilitator.email,
-        ).first()
-
+        selected_participant = exercise.participants.filter(email=facilitator.email).first() if facilitator.email else None
         if selected_participant is None:
-            selected_participant = current_facilitator or Participant(exercise=exercise)
-        elif current_facilitator and selected_participant != current_facilitator:
-            current_facilitator.role = Participant.Role.USER
-            current_facilitator.save(update_fields=["role", "updated_at"])
-
+            selected_participant = Participant(exercise=exercise)
         selected_participant.first_name = facilitator.first_name
         selected_participant.last_name = facilitator.last_name
         selected_participant.email = facilitator.email or None
         selected_participant.role = Participant.Role.FACILITATOR
         selected_participant.save()
+        exercise.facilitator = selected_participant
+        exercise.save(update_fields=["facilitator"])
+
+    if assistant_ids is not None:
+        exercise.participants.filter(role=Participant.Role.FACILITATOR).exclude(
+            id__in=[exercise.facilitator_id, *assistant_ids]
+        ).update(role=Participant.Role.USER)
 
     return Status(200, exercise)
 
@@ -399,6 +423,7 @@ def get_participant(request, exercise_id: UUID, participant_id: UUID):
         404: NotFoundResponseSchema,
     },
 )
+@transaction.atomic
 def update_participant(
     request,
     exercise_id: UUID,
@@ -406,6 +431,7 @@ def update_participant(
     payload: ParticipantUpdateSchema,
 ):
     """Update a participant."""
+    Exercise.objects.select_for_update().filter(id=exercise_id).first()
     try:
         participant = Participant.objects.get(
             id=participant_id,
@@ -416,6 +442,9 @@ def update_participant(
 
     data = payload.model_dump(exclude_unset=True)
     new_role = data.get("role")
+
+    if participant.id == participant.exercise.facilitator_id and new_role is not None and new_role != Participant.Role.FACILITATOR:
+        return Status(400, {"message": "Assign a replacement facilitator first"})
 
     if (
         participant.role == Participant.Role.FACILITATOR
@@ -449,8 +478,10 @@ def update_participant(
         404: NotFoundResponseSchema,
     },
 )
+@transaction.atomic
 def delete_participant(request, exercise_id: UUID, participant_id: UUID):
     """Delete a participant."""
+    Exercise.objects.select_for_update().filter(id=exercise_id).first()
     try:
         participant = Participant.objects.get(
             id=participant_id,
@@ -458,6 +489,9 @@ def delete_participant(request, exercise_id: UUID, participant_id: UUID):
         )
     except Participant.DoesNotExist:
         return Status(404, {"message": "Participant not found"})
+
+    if participant.id == participant.exercise.facilitator_id:
+        return Status(400, {"message": "Assign a replacement facilitator first"})
 
     if participant.role == Participant.Role.FACILITATOR:
         facilitator_count = Participant.objects.filter(
@@ -474,6 +508,16 @@ def delete_participant(request, exercise_id: UUID, participant_id: UUID):
     participant.delete()
 
     return Status(204, None)
+
+
+def _valid_new_inject_numbers(new_injects: list[dict], existing_numbers: set[str]) -> bool:
+    """Check that new inject numbers are valid and unique."""
+    numbers = [inject["number"] for inject in new_injects]
+    return (
+        all(number.strip() and len(number) <= 10 for number in numbers)
+        and len(numbers) == len(set(numbers))
+        and not existing_numbers.intersection(numbers)
+    )
 
 
 @exercises_router.post(
@@ -494,7 +538,10 @@ def create_event(request, exercise_id: UUID, payload: EventCreateSchema):
 
     data = payload.model_dump()
     new_objective_data = data.pop("new_objectives")
+    new_inject_data = data.pop("new_injects")
     objective_ids = data.pop("objective_ids")
+    if not _valid_new_inject_numbers(new_inject_data, set()):
+        return Status(400, {"message": "Inject numbers must be unique and contain 1 to 10 characters"})
     objectives, invalid_ids = _get_objectives(
         objective_ids,
         exercise.objectives.all(),
@@ -509,12 +556,17 @@ def create_event(request, exercise_id: UUID, payload: EventCreateSchema):
     exercise.objectives.add(*new_objectives)
     objectives.extend(new_objectives)
 
+    position = Event.objects.filter(exercise=exercise).aggregate(
+        max_position=Max("position")
+    )["max_position"]
     event = Event.objects.create(
         exercise=exercise,
+        position=0 if position is None else position + 1,
         **data,
     )
 
     event.objectives.set(objectives)
+    Inject.objects.bulk_create([Inject(event=event, **inject) for inject in new_inject_data])
 
     return Status(201, event)
 
@@ -537,6 +589,29 @@ def list_events(request, exercise_id: UUID):
         200,
         Event.objects.filter(exercise=exercise),
     )
+
+
+@exercises_router.put(
+    "/{exercise_id}/events/order/",
+    response={204: None, 400: BadRequestResponseSchema, 404: NotFoundResponseSchema},
+)
+@transaction.atomic
+def reorder_events(request, exercise_id: UUID, payload: EventOrderSchema):
+    """Set the display order of all events in an exercise."""
+    try:
+        exercise = Exercise.objects.select_for_update().get(id=exercise_id)
+    except Exercise.DoesNotExist:
+        return Status(404, {"message": "Exercise not found"})
+
+    events = list(Event.objects.filter(exercise=exercise))
+    events_by_id = {event.id: event for event in events}
+    if len(payload.event_ids) != len(events) or set(payload.event_ids) != set(events_by_id):
+        return Status(400, {"message": "Provide each event in the exercise once"})
+
+    for position, event_id in enumerate(payload.event_ids):
+        events_by_id[event_id].position = position
+    Event.objects.bulk_update(events, ["position"])
+    return Status(204, None)
 
 
 @exercises_router.get(
@@ -586,7 +661,11 @@ def update_event(
     data = payload.model_dump(exclude_unset=True)
 
     new_objective_data = data.pop("new_objectives", None)
+    new_inject_data = data.pop("new_injects", None) or []
     objective_ids = data.pop("objective_ids", None)
+    existing_numbers = set(event.injects.values_list("number", flat=True))
+    if not _valid_new_inject_numbers(new_inject_data, existing_numbers):
+        return Status(400, {"message": "Inject numbers must be unique and contain 1 to 10 characters"})
 
     objectives = None
     if objective_ids is not None:
@@ -614,6 +693,7 @@ def update_event(
 
     if objective_ids is not None or new_objective_data:
         event.objectives.set(objectives)
+    Inject.objects.bulk_create([Inject(event=event, **inject) for inject in new_inject_data])
 
     return Status(200, event)
 

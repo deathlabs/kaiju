@@ -36,6 +36,13 @@ class Exercise(models.Model):
         related_name="exercises_updated",
         on_delete=models.PROTECT,
     )
+    facilitator = models.ForeignKey(
+        "Participant",
+        related_name="facilitated_exercises",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
     references = models.ManyToManyField(
         "references.Reference",
         related_name="exercises",
@@ -61,6 +68,15 @@ class Exercise(models.Model):
         choices=Status.choices,
         default=Status.PLANNED,
     )
+
+    @property
+    def assistant_facilitator_ids(self):
+        return [
+            participant.id
+            for participant in self.participants.all()
+            if participant.role == Participant.Role.FACILITATOR
+            and participant.id != self.facilitator_id
+        ]
 
 
 class Participant(models.Model):
@@ -114,6 +130,7 @@ class Event(models.Model):
         on_delete=models.CASCADE,
     )
     number = models.PositiveIntegerField()
+    position = models.PositiveIntegerField(default=0)
     description = models.CharField(max_length=255)
     objectives = models.ManyToManyField(
         "objectives.Objective",
@@ -122,6 +139,7 @@ class Event(models.Model):
     )
 
     class Meta:
+        ordering = ["position", "number"]
         constraints = (
             models.UniqueConstraint(
                 fields=["exercise", "number"],

@@ -31,7 +31,12 @@ def create_reference(request, payload: ReferenceCreateSchema):
 @references_router.get("/", response={200: list[ReferenceSchema]})
 def list_references(request):
     """Fetch all references."""
-    return Status(200, Reference.objects.annotate(exercise_count=Count("exercises")))
+    return Status(
+        200,
+        Reference.objects.annotate(exercise_count=Count("exercises")).prefetch_related(
+            "exercises",
+        ),
+    )
 
 
 @references_router.get(
@@ -46,7 +51,7 @@ def get_reference(request, reference_id: UUID):
     try:
         reference = Reference.objects.annotate(
             exercise_count=Count("exercises"),
-        ).get(id=reference_id)
+        ).prefetch_related("exercises").get(id=reference_id)
         return Status(200, reference)
     except Reference.DoesNotExist:
         return Status(404, {"message": "Reference not found"})
@@ -72,7 +77,7 @@ def update_reference(request, reference_id: UUID, payload: ReferenceUpdateSchema
     reference.save()
     reference = Reference.objects.annotate(
         exercise_count=Count("exercises"),
-    ).get(id=reference_id)
+    ).prefetch_related("exercises").get(id=reference_id)
     return Status(200, reference)
 
 

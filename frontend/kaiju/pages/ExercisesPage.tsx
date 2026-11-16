@@ -29,6 +29,16 @@ import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 
+import blobbo from '../assets/blobbo.png'
+import boulderback from '../assets/boulderback.png'
+import crabzilla from '../assets/crabzilla.png'
+import flutterwing from '../assets/flutterwing.png'
+import frostfin from '../assets/frostfin.png'
+import jellyfloat from '../assets/jellyfloat.png'
+import mossback from '../assets/mossback.png'
+import octobeast from '../assets/octobeast.png'
+import shroomzilla from '../assets/shroomzilla.png'
+import spiketus from '../assets/spiketus.png'
 import { ExerciseWorkspace } from './ExerciseWorkspace'
 
 type ExerciseType = 'discussion' | 'discussion_and_hands_on'
@@ -49,6 +59,7 @@ interface SelectableUser {
 }
 
 interface ExerciseParticipant {
+  id: string
   first_name: string
   last_name: string
   role: string
@@ -66,7 +77,8 @@ interface ExerciseSummary {
   type: ExerciseType
   title: string
   status: ExerciseStatus
-  participants?: ExerciseParticipant[]
+  facilitator_id: string | null
+  participants: ExerciseParticipant[]
 }
 
 interface Objective {
@@ -120,6 +132,12 @@ const newReferenceValuePrefix = 'new-reference:'
 const defaultTitle = 'Unknown Outbound Network Activity'
 const defaultScenario =
   'At 0400, unknown outbound network activity was observed from the production environment.'
+const exerciseImages = [mossback, blobbo, frostfin, boulderback, crabzilla, flutterwing, jellyfloat, octobeast, shroomzilla, spiketus]
+
+const exerciseImage = (id: string) => {
+  const value = Number.parseInt(id.replaceAll('-', '').slice(-8), 16)
+  return exerciseImages[((value || 1) - 1) % exerciseImages.length]
+}
 const emptyForm: ExerciseForm = {
   facilitatorUsername: '',
   newObjectives: [],
@@ -143,6 +161,13 @@ const statusLabels: Record<ExerciseStatus, string> = {
   prepared: 'Prepared',
   in_progress: 'In progress',
   completed: 'Completed',
+}
+
+const statusColors: Record<ExerciseStatus, 'default' | 'info' | 'warning' | 'success'> = {
+  planned: 'default',
+  prepared: 'info',
+  in_progress: 'warning',
+  completed: 'success',
 }
 
 const referenceTypeLabels: Record<ReferenceType, string> = {
@@ -313,7 +338,7 @@ export function ExercisesPage() {
 
       const exerciseDetails = (await response.json()) as ExerciseSummary
       const facilitator = exerciseDetails.participants?.find(
-        (participant) => participant.role === 'facilitator',
+        (participant) => participant.id === exerciseDetails.facilitator_id,
       )
       const facilitatorUser = users.find(
         (user) =>
@@ -321,6 +346,7 @@ export function ExercisesPage() {
           user.last_name === facilitator?.last_name,
       )
       setEditingExercise(exerciseDetails)
+      setWorkspaceExercise(exerciseDetails)
       setForm({
         facilitatorUsername: facilitatorUser?.username ?? '',
         newObjectives: [],
@@ -351,7 +377,11 @@ export function ExercisesPage() {
   }
 
   const closeForm = () => {
-    if (!saving) setFormOpen(false)
+    if (!saving) {
+      setFormOpen(false)
+      setWorkspaceExercise(null)
+      void loadExercises()
+    }
   }
 
   const openNewObjectiveDialog = () => {
@@ -425,14 +455,12 @@ export function ExercisesPage() {
     if (!editingExercise) return
 
     setDeletingExercise(editingExercise)
-    setFormOpen(false)
   }
 
   const closeDeleteConfirmation = () => {
     if (deleting) return
 
     setDeletingExercise(null)
-    setFormOpen(true)
   }
 
   const deleteExercise = async () => {
@@ -455,6 +483,8 @@ export function ExercisesPage() {
       )
       setDeletingExercise(null)
       setEditingExercise(null)
+      setFormOpen(false)
+      setWorkspaceExercise(null)
     } catch (error) {
       setPageError(
         error instanceof Error ? error.message : 'Could not delete the exercise.',
@@ -537,7 +567,17 @@ export function ExercisesPage() {
             )
           : [...currentExercises, savedExercise],
       )
-      setFormOpen(false)
+      setEditingExercise(savedExercise)
+      setWorkspaceExercise(savedExercise)
+      setForm((currentForm) => ({
+        ...currentForm,
+        title: savedExercise.title,
+        scenario: savedExercise.scenario,
+        objectiveIds: savedExercise.objectives.map((objective) => objective.id),
+        referenceIds: savedExercise.references.map((reference) => reference.id),
+        newObjectives: [],
+        newReferences: [],
+      }))
     } catch (error) {
       setFormError(
         error instanceof Error ? error.message : 'Could not save the exercise.',
@@ -809,7 +849,7 @@ export function ExercisesPage() {
               <Card variant="outlined">
                 <CardActionArea
                   aria-label={`Open ${exercise.title}`}
-                  onClick={() => setWorkspaceExercise(exercise)}
+                  onClick={() => void openEditForm(exercise)}
                 >
                   <CardContent>
                     <Stack
@@ -817,11 +857,12 @@ export function ExercisesPage() {
                       spacing={2}
                       sx={{ justifyContent: 'space-between' }}
                     >
-                      <Chip label={statusLabels[exercise.status]} size="small" />
                       <Typography color="text.secondary" variant="caption">
                         {typeLabels[exercise.type]}
                       </Typography>
+                      <Chip color={statusColors[exercise.status]} label={statusLabels[exercise.status]} size="small" />
                     </Stack>
+                    <Box component="img" src={exerciseImage(exercise.id)} alt="" sx={{ float: 'right', width: { xs: 100, sm: 140 }, ml: 1, mt: 1 }} />
                     <Typography component="h2" sx={{ mt: 2 }} variant="h6">
                       {exercise.title}
                     </Typography>
@@ -843,19 +884,8 @@ export function ExercisesPage() {
                       </Typography>
                     </Stack>
                     <Stack direction="row" spacing={2} sx={{ mt: 2 }}>
-                      <Typography
-                        color="text.secondary"
-                        sx={{ flex: 1 }}
-                        variant="caption"
-                      >
-                        Created by {formatUserName(exercise.created_by)}
-                      </Typography>
-                      <Typography
-                        color="text.secondary"
-                        sx={{ flex: 1 }}
-                        variant="caption"
-                      >
-                        Last modified by {formatUserName(exercise.updated_by)}
+                      <Typography color="text.secondary" sx={{ flex: 1 }} variant="body2">
+                        Facilitator: {exercise.participants.filter((participant) => participant.id === exercise.facilitator_id).map((participant) => `${participant.first_name} ${participant.last_name}`.trim() || 'Unnamed facilitator').join(', ') || 'None'}
                       </Typography>
                     </Stack>
                   </CardContent>
@@ -868,20 +898,8 @@ export function ExercisesPage() {
 
       <ExerciseWorkspace
         exerciseId={workspaceExercise?.id ?? null}
-        onClose={() => setWorkspaceExercise(null)}
-        onEdit={() => {
-          if (!workspaceExercise) return
-          const exercise = workspaceExercise
-          setWorkspaceExercise(null)
-          void openEditForm(exercise)
-        }}
-      />
-
-      <Dialog fullWidth maxWidth="md" onClose={closeForm} open={formOpen}>
+        form={formOpen ? (
         <Box component="form" onSubmit={saveExercise}>
-          <DialogTitle>
-            {editingExercise ? 'Edit exercise' : 'Create exercise'}
-          </DialogTitle>
           <DialogContent>
             {formError && (
               <Alert severity="error" sx={{ mb: 2 }}>
@@ -1217,7 +1235,13 @@ export function ExercisesPage() {
             )}
           </DialogActions>
         </Box>
-      </Dialog>
+        ) : null}
+        onClose={() => {
+          setFormOpen(false)
+          setWorkspaceExercise(null)
+          void loadExercises()
+        }}
+      />
 
       <Dialog
         fullWidth
