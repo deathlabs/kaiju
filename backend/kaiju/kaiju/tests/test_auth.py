@@ -428,6 +428,38 @@ class AuthenticationTests(TestCase):
             exercise.refresh_from_db()
             self.assertEqual(exercise.facilitator_id, assistant.id)
 
+    def test_participant_role_limits(self):
+        exercise_id = self._create_exercise().json()["id"]
+        exercise = Exercise.objects.get(id=exercise_id)
+        limits = {
+            Participant.Role.FACILITATOR: 3,
+            Participant.Role.ISO: 1,
+            Participant.Role.ISSM: 1,
+            Participant.Role.ISSO: 4,
+            Participant.Role.SYSTEM_ADMINISTRATOR: 4,
+            Participant.Role.USER: 10,
+            Participant.Role.CSSP: 2,
+        }
+        with self._settings():
+            for role, limit in limits.items():
+                with self.subTest(role=role):
+                    while exercise.participants.filter(role=role).count() < limit:
+                        Participant.objects.create(exercise=exercise, first_name="Test", last_name="Person", role=role)
+                    response = self.client.post(
+                        f"/api/v1/exercises/{exercise_id}/participants/",
+                        data=json.dumps({"first_name": "Extra", "last_name": "Person", "role": role}),
+                        content_type="application/json", **self._authorization(self._token()),
+                    )
+                    self.assertEqual(response.status_code, 400)
+                    candidate = Participant.objects.create(exercise=exercise, first_name="Other", last_name="Person", role=Participant.Role.OPFOR)
+                    response = self.client.patch(
+                        f"/api/v1/exercises/{exercise_id}/participants/{candidate.id}/",
+                        data=json.dumps({"role": role}), content_type="application/json", **self._authorization(self._token()),
+                    )
+                    self.assertEqual(response.status_code, 400)
+                    candidate.refresh_from_db()
+                    self.assertEqual(candidate.role, Participant.Role.OPFOR)
+
     def test_exercise_creation_attaches_objectives(self):
         objective = Objective.objects.create(
             title="Validate escalation",
@@ -880,6 +912,32 @@ class AuthenticationTests(TestCase):
         event = Event.objects.get(id=event_id)
         self.assertEqual(event.description, "Investigate the alert.")
         self.assertEqual(event.objectives.get(), exercise_objective)
+
+    def test_resolve_inject_requires_release_and_facilitator(self):
+        exercise_id = self._create_exercise().json()["id"]
+        event = Event.objects.create(exercise_id=exercise_id, number=1, description="Investigate.")
+        inject = Inject.objects.create(
+            event=event, recipient=Inject.Role.ISSO, number="1A",
+            scheduled_start_time="2026-11-16T13:05:00Z", delivery_method=Inject.DeliveryMethod.EMAIL,
+            sender=Inject.Role.CSSP, message="Investigate the traffic.",
+        )
+        base = f"/api/v1/exercises/{exercise_id}/events/{event.id}/injects/{inject.id}/"
+        facilitator = self._authorization(self._token())
+        player = self._authorization(self._token(username="player", email="player@example.com"))
+        with self._settings():
+            forbidden = self.client.post(base + "resolve/", data="{}", content_type="application/json", **player)
+            unreleased = self.client.post(base + "resolve/", data="{}", content_type="application/json", **facilitator)
+            released = self.client.post(base + "send/", data="{}", content_type="application/json", **facilitator)
+            resolved = self.client.post(base + "resolve/", data="{}", content_type="application/json", **facilitator)
+            repeated = self.client.post(base + "resolve/", data="{}", content_type="application/json", **facilitator)
+            detail = self.client.get(f"/api/v1/exercises/{exercise_id}/", **facilitator)
+        self.assertEqual(forbidden.status_code, 403)
+        self.assertEqual(unreleased.status_code, 400)
+        self.assertEqual(released.status_code, 200)
+        self.assertEqual(resolved.status_code, 200)
+        self.assertIsNotNone(resolved.json()["ended_at"])
+        self.assertEqual(resolved.json()["ended_at"], repeated.json()["ended_at"])
+        self.assertEqual(detail.json()["events"][0]["injects"][0]["ended_at"], resolved.json()["ended_at"])
 
     def test_exercise_card_send_and_reply(self):
         exercise_id = self._create_exercise().json()["id"]

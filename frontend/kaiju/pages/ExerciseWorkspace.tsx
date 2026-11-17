@@ -1,4 +1,5 @@
 import { injectRoleLabels, type InjectRole } from './injectRoles'
+import { deliveryMethodLabels, InjectDeliveryMethod, type DeliveryMethod } from './InjectDeliveryMethod'
 import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
@@ -34,7 +35,6 @@ import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react'
 
-type DeliveryMethod = 'index_card' | 'phone_call' | 'email' | 'chat_message'
 type ParticipantRole = InjectRole | 'facilitator'
 
 interface Objective {
@@ -116,13 +116,6 @@ interface InjectForm {
   recipient: InjectRole
   message: string
   expectedResponse: string
-}
-
-const deliveryMethodLabels: Record<DeliveryMethod, string> = {
-  index_card: 'Index card',
-  phone_call: 'Phone call',
-  email: 'Email',
-  chat_message: 'Chat message',
 }
 
 const participantRoleLabels: Record<ParticipantRole, string> = {
@@ -559,7 +552,7 @@ export function ExerciseWorkspace({ exerciseId, form, onClose }: ExerciseWorkspa
                         <Table size="small">
                           <TableHead><TableRow><TableCell>Inject</TableCell><TableCell>Scheduled</TableCell><TableCell>Method</TableCell><TableCell>From</TableCell><TableCell>To</TableCell><TableCell>Message</TableCell><TableCell /></TableRow></TableHead>
                           <TableBody>
-                            {event.injects.map((inject) => <TableRow key={inject.id}><TableCell>{inject.number}</TableCell><TableCell>{new Date(inject.scheduled_start_time).toLocaleString()}</TableCell><TableCell>{deliveryMethodLabels[inject.delivery_method]}</TableCell><TableCell>{injectRoleLabels[inject.sender]}</TableCell><TableCell>{injectRoleLabels[inject.recipient]}</TableCell><TableCell sx={{ maxWidth: 360 }}>{inject.message}</TableCell><TableCell><IconButton aria-label={`Edit inject ${inject.number}`} onClick={() => openInjectForm(event, inject)}><EditIcon /></IconButton><IconButton aria-label={`Delete inject ${inject.number}`} color="error" onClick={() => void deleteInject(event, inject)}><DeleteIcon /></IconButton></TableCell></TableRow>)}
+                            {event.injects.map((inject) => <TableRow key={inject.id}><TableCell>{inject.number}</TableCell><TableCell>{new Date(inject.scheduled_start_time).toLocaleString()}</TableCell><TableCell><InjectDeliveryMethod method={inject.delivery_method} /></TableCell><TableCell>{injectRoleLabels[inject.sender]}</TableCell><TableCell>{injectRoleLabels[inject.recipient]}</TableCell><TableCell sx={{ maxWidth: 360 }}>{inject.message}</TableCell><TableCell><IconButton aria-label={`Edit inject ${inject.number}`} onClick={() => openInjectForm(event, inject)}><EditIcon /></IconButton><IconButton aria-label={`Delete inject ${inject.number}`} color="error" onClick={() => void deleteInject(event, inject)}><DeleteIcon /></IconButton></TableCell></TableRow>)}
                             {event.injects.length === 0 && <TableRow><TableCell colSpan={7}>No injects have been added.</TableCell></TableRow>}
                           </TableBody>
                         </Table>

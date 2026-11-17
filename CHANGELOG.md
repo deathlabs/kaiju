@@ -2,6 +2,9 @@
 
 ## [0.1.0] - 2026-11-13
 ### Added
+- Added an exercise timeline with event tabs and facilitator inject resolution to backend and frontend version 0.1.0. Future event tabs open after preceding injects are released and resolved. Both components remain at version 0.1.0 from version 0.1.0.
+- Added a user-role participant to the development exercise seed data in backend version 0.1.0. The backend remains at version 0.1.0 from version 0.1.0.
+- Added an event and inject list to the exercise run page. Facilitators can make injects visible in the participant feed. Frontend remains at version 0.1.0 from version 0.1.0.
 - Added exercise chat with live updates, Enter-to-send, immediate confirmation, and facilitator message management in backend and frontend version 0.1.0. Both components remain at version 0.1.0 from version 0.1.0.
 - Added an exercise feed within the application layout with sent inject cards that show sender and recipient roles, question and response cards from any signed-in user, and facilitator findings in backend and frontend version 0.1.0. Both components remain at version 0.1.0 from version 0.1.0.
 - Added creature illustrations to exercise cards in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
@@ -28,6 +31,11 @@
 - Added objective creation from the event form to frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 
 ### Changed
+- Limited exercise role assignments and updated the development roster in backend version 0.1.0. Reseeding removes obsolete seed participants when safe. The backend remains at version 0.1.0 from version 0.1.0.
+- Listed names under each role and separated start and end times in the exercise details panel in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Added delivery method icons to injects in frontend version 0.1.0. Inject cards show the icon at the top right. The frontend remains at version 0.1.0 from version 0.1.0.
+- Changed the default seeded facilitator to Justin Hartung in backend version 0.1.0. The backend remains at version 0.1.0 from version 0.1.0.
+- Renamed the exercise run feed and chat headings in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 - Added breadcrumb navigation to the exercise run in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 - Organized the exercise run into separate exercise details, feed, and chat panels with a horizontally collapsible details panel, clickable objectives, and consistent page spacing in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 - Sorted exercise cards by status, with in-progress exercises first and completed exercises last, in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.

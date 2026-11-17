@@ -19,6 +19,7 @@ from exercises.models import (
     Participant,
     Response,
 )
+from exercises.role_limits import ROLE_LIMITS
 from exercises.schemas import (
     AfterActionReportSchema,
     BadRequestResponseSchema,
@@ -51,6 +52,11 @@ from references.models import Reference
 
 # Init the exercises router.
 exercises_router = Router(tags=["exercises"])
+
+def _role_limit_message(role: str) -> str:
+    if role == Participant.Role.FACILITATOR:
+        return "An exercise can have at most two assistant facilitators"
+    return f"An exercise can have at most {ROLE_LIMITS[role]} participants with the {Participant.Role(role).label} role"
 
 
 def _get_objectives(
@@ -226,6 +232,8 @@ def update_exercise(request, exercise_id: UUID, payload: ExerciseUpdateSchema):
     if facilitator_id is not None and facilitator_username is not None:
         return Status(400, {"message": "Select a facilitator using one identifier"})
     if assistant_ids is not None:
+        if len(assistant_ids) > 2:
+            return Status(400, {"message": _role_limit_message(Participant.Role.FACILITATOR)})
         if len(assistant_ids) != len(set(assistant_ids)):
             return Status(400, {"message": "Assistant facilitator IDs must be unique"})
         if (facilitator_id or exercise.facilitator_id) in assistant_ids:
@@ -247,6 +255,14 @@ def update_exercise(request, exercise_id: UUID, payload: ExerciseUpdateSchema):
             facilitator = get_user_model().objects.get(username=facilitator_username)
         except get_user_model().DoesNotExist:
             return Status(400, {"message": "The selected facilitator does not exist"})
+        existing = exercise.participants.filter(email=facilitator.email).first() if facilitator.email else None
+        if (existing is None or existing.role != Participant.Role.FACILITATOR) and exercise.participants.filter(role=Participant.Role.FACILITATOR).count() >= ROLE_LIMITS[Participant.Role.FACILITATOR]:
+            return Status(400, {"message": _role_limit_message(Participant.Role.FACILITATOR)})
+
+    if assistant_ids is not None:
+        demoted_count = exercise.participants.filter(role=Participant.Role.FACILITATOR).exclude(id__in=[facilitator_id or exercise.facilitator_id, *assistant_ids]).count()
+        if demoted_count and exercise.participants.filter(role=Participant.Role.USER).count() + demoted_count > ROLE_LIMITS[Participant.Role.USER]:
+            return Status(400, {"message": _role_limit_message(Participant.Role.USER)})
 
     objectives = None
     if objective_ids is not None:
@@ -363,16 +379,20 @@ def delete_exercise(request, exercise_id: UUID):
     "/{exercise_id}/participants/",
     response={
         201: ParticipantSchema,
+        400: BadRequestResponseSchema,
         404: NotFoundResponseSchema,
     },
 )
+@transaction.atomic
 def create_participant(request, exercise_id: UUID, payload: ParticipantCreateSchema):
     """Create a participant."""
     try:
-        exercise = Exercise.objects.get(id=exercise_id)
+        exercise = Exercise.objects.select_for_update().get(id=exercise_id)
     except Exercise.DoesNotExist:
         return Status(404, {"message": "Exercise not found"})
 
+    if payload.role in ROLE_LIMITS and exercise.participants.filter(role=payload.role).count() >= ROLE_LIMITS[payload.role]:
+        return Status(400, {"message": _role_limit_message(payload.role)})
     participant = Participant.objects.create(
         exercise=exercise,
         **payload.model_dump(),
@@ -448,6 +468,9 @@ def update_participant(
 
     data = payload.model_dump(exclude_unset=True)
     new_role = data.get("role")
+
+    if new_role is not None and new_role != participant.role and new_role in ROLE_LIMITS and Participant.objects.filter(exercise_id=exercise_id, role=new_role).count() >= ROLE_LIMITS[new_role]:
+        return Status(400, {"message": _role_limit_message(new_role)})
 
     if participant.id == participant.exercise.facilitator_id and new_role is not None and new_role != Participant.Role.FACILITATOR:
         return Status(400, {"message": "Assign a replacement facilitator first"})
@@ -875,9 +898,29 @@ def send_inject(request, exercise_id: UUID, event_id: UUID, inject_id: UUID):
 
 
 @exercises_router.post(
+    "/{exercise_id}/events/{event_id}/injects/{inject_id}/resolve/",
+    response={200: InjectSchema, 400: BadRequestResponseSchema, 403: BadRequestResponseSchema, 404: NotFoundResponseSchema},
+)
+def resolve_inject(request, exercise_id: UUID, event_id: UUID, inject_id: UUID):
+    """Mark a released inject as resolved."""
+    participant = participant_for(request.user, exercise_id)
+    if participant is None or participant.role != Participant.Role.FACILITATOR:
+        return Status(403, {"message": "Only exercise facilitators can resolve injects."})
+    injects = Inject.objects.filter(id=inject_id, event_id=event_id, event__exercise_id=exercise_id)
+    if not injects.exists():
+        return Status(404, {"message": "Inject not found"})
+    injects.filter(started_at__isnull=False, ended_at__isnull=True).update(ended_at=timezone.now())
+    inject = injects.get()
+    if inject.started_at is None:
+        return Status(400, {"message": "Release the inject before marking it resolved."})
+    return Status(200, inject)
+
+
+@exercises_router.post(
     "/{exercise_id}/events/{event_id}/injects/{inject_id}/cards/",
     response={201: ResponseSchema, 400: BadRequestResponseSchema, 403: BadRequestResponseSchema, 404: NotFoundResponseSchema},
 )
+@transaction.atomic
 def create_card_reply(request, exercise_id: UUID, event_id: UUID, inject_id: UUID, payload: CardReplyCreateSchema):
     """Add a participant reply to a sent inject card."""
     inject = Inject.objects.filter(
@@ -889,6 +932,7 @@ def create_card_reply(request, exercise_id: UUID, event_id: UUID, inject_id: UUI
     text = payload.text.strip()
     if not text:
         return Status(400, {"message": "Enter a message."})
+    Exercise.objects.select_for_update().filter(id=exercise_id).first()
     participant = Participant.objects.filter(exercise_id=exercise_id, user=request.user).first()
     if participant is None and request.user.email:
         participant = Participant.objects.filter(
@@ -898,6 +942,8 @@ def create_card_reply(request, exercise_id: UUID, event_id: UUID, inject_id: UUI
         participant.user = request.user
         participant.save(update_fields=["user"])
     if participant is None:
+        if Participant.objects.filter(exercise_id=exercise_id, role=Participant.Role.USER).count() >= ROLE_LIMITS[Participant.Role.USER]:
+            return Status(400, {"message": _role_limit_message(Participant.Role.USER)})
         participant, _ = Participant.objects.get_or_create(
             exercise_id=exercise_id,
             user=request.user,

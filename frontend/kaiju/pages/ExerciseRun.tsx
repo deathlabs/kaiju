@@ -1,22 +1,27 @@
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import { injectRoleLabels, type InjectRole } from './injectRoles'
+import { InjectDeliveryMethod, type DeliveryMethod } from './InjectDeliveryMethod'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { Alert, Box, Breadcrumbs, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Divider, IconButton, Link, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material'
+import { Alert, Box, Breadcrumbs, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Divider, IconButton, Link, MenuItem, Paper, Stack, Tab, Tabs, TextField, Typography } from '@mui/material'
 
-interface Participant { id: string; first_name: string; last_name: string; email: string | null; role: string }
+type ParticipantRole = InjectRole | 'facilitator'
+interface Participant { id: string; first_name: string; last_name: string; email: string | null; role: ParticipantRole }
 interface Reply { id: string; created_at: string; type: 'response' | 'question'; text: string; participant: Participant }
-interface Inject { id: string; number: string; sender: InjectRole; recipient: InjectRole; message: string; started_at: string | null; responses: Reply[] }
+interface Inject { id: string; number: string; delivery_method: DeliveryMethod; sender: InjectRole; recipient: InjectRole; message: string; expected_response: string; started_at: string | null; ended_at: string | null; responses: Reply[] }
 interface Event { id: string; number: number; description: string; injects: Inject[] }
 interface Finding { id: string; type: string; topic: string; observation: string; recommendation: string }
 interface Objective { id: string; title: string; description: string }
-interface Exercise { title: string; scenario: string; type: 'discussion' | 'discussion_and_hands_on'; scheduled_start_time: string; scheduled_end_time: string; participants: Participant[]; objectives: Objective[]; events: Event[]; findings: Finding[] }
+interface Exercise { title: string; scenario: string; type: 'discussion' | 'discussion_and_hands_on'; scheduled_start_time: string; scheduled_end_time: string; facilitator_id: string | null; assistant_facilitator_ids: string[]; participants: Participant[]; objectives: Objective[]; events: Event[]; findings: Finding[] }
 interface ChatMessage { id: string; author_name: string; created_at: string; text: string }
 interface CurrentUser { email: string }
+
+const participantRoleLabels: Record<ParticipantRole, string> = { facilitator: 'Facilitator', ...injectRoleLabels }
 
 export function ExerciseRun({ exerciseId }: { exerciseId: string }) {
   const [scenarioOpen, setScenarioOpen] = useState(true)
   const [selectedObjective, setSelectedObjective] = useState<Objective | null>(null)
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
   const [exercise, setExercise] = useState<Exercise | null>(null)
   const [user, setUser] = useState<CurrentUser | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -75,9 +80,9 @@ export function ExerciseRun({ exerciseId }: { exerciseId: string }) {
   }
   const participant = user?.email && exercise?.participants.find((item) => item.email?.toLowerCase() === user.email.toLowerCase())
   const facilitator = participant && participant.role === 'facilitator'
-  const injects = exercise?.events.flatMap((event) => event.injects.map((inject) => ({ event, inject }))) ?? []
-  const sent = injects.filter(({ inject }) => inject.started_at).sort((a, b) => a.inject.started_at!.localeCompare(b.inject.started_at!))
-  const pending = injects.filter(({ inject }) => !inject.started_at)
+  const availableEvents = exercise?.events.filter((_, index, events) => events.slice(0, index).every((event) => event.injects.length > 0 && event.injects.every((inject) => inject.started_at && inject.ended_at))) ?? []
+  const selectedEvent = availableEvents.find((event) => event.id === selectedEventId) ?? availableEvents[0]
+  const sent = (selectedEvent?.injects ?? []).filter((inject) => inject.started_at).sort((a, b) => a.started_at!.localeCompare(b.started_at!)).map((inject) => ({ event: selectedEvent!, inject }))
   const post = async (path: string, data?: object) => {
     setSaving(true)
     setError(null)
@@ -120,29 +125,56 @@ export function ExerciseRun({ exerciseId }: { exerciseId: string }) {
       {error && <Alert severity="error" action={<Button color="inherit" onClick={() => void load()}>Retry</Button>}>{error}</Alert>}
       {loading && <Box sx={{ textAlign: 'center', py: 5 }}><CircularProgress /></Box>}
       {exercise && <>
+        <Paper component="section" aria-label="Exercise Timeline" variant="outlined" sx={{ p: 2, minWidth: 0 }}>
+          {exercise.events.length === 0 ? <Typography color="text.secondary">No events have been added.</Typography> :
+            <Tabs value={selectedEvent?.id ?? false} onChange={(_, value: string) => { setSelectedEventId(value); setReplyTo('') }} variant="scrollable" scrollButtons="auto" aria-label="Exercise events" sx={{ '& .MuiTabs-list': { width: 'max-content', mx: 'auto' } }}>
+              {exercise.events.map((event) => <Tab key={event.id} value={event.id} id={`event-tab-${event.id}`} aria-controls="event-feed-panel" disabled={!availableEvents.some((available) => available.id === event.id)} label={`Event ${event.number}`} />)}
+            </Tabs>
+          }
+        </Paper>
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: 'minmax(0, 1fr) minmax(0, 1fr)', lg: scenarioOpen ? 'minmax(220px, 0.8fr) minmax(0, 1.5fr) minmax(300px, 1fr)' : '48px minmax(0, 1.5fr) minmax(300px, 1fr)' }, gap: 2, alignItems: 'start' }}>
         <Paper component="section" aria-label="Exercise details" variant="outlined" sx={{ minWidth: 0, gridColumn: { md: '1 / -1', lg: 'auto' }, display: 'flex', flexDirection: 'column', minHeight: { lg: '55vh' }, justifySelf: { xs: scenarioOpen ? 'stretch' : 'start', lg: 'stretch' } }}>
           <Stack id="scenario-details" spacing={2} hidden={!scenarioOpen} sx={{ display: scenarioOpen ? 'flex' : 'none', p: 2 }}>
           <Box><Typography variant="subtitle2">Scenario</Typography><Typography sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{exercise.scenario}</Typography></Box>
           <Divider />
           <Box><Typography variant="subtitle2">Type</Typography><Typography>{exercise.type === 'discussion_and_hands_on' ? 'Discussion and Hands-On' : 'Discussion'}</Typography></Box>
-          <Box><Typography variant="subtitle2">Schedule</Typography><Typography>{new Date(exercise.scheduled_start_time).toLocaleString()} – {new Date(exercise.scheduled_end_time).toLocaleString()}</Typography></Box>
+          <Box><Typography variant="subtitle2">Start Time</Typography><Typography>{new Date(exercise.scheduled_start_time).toLocaleString()}</Typography></Box>
+          <Box><Typography variant="subtitle2">End Time</Typography><Typography>{new Date(exercise.scheduled_end_time).toLocaleString()}</Typography></Box>
           <Box><Typography variant="subtitle2">Objectives</Typography>{exercise.objectives.length ? <Box component="ul" sx={{ m: 0, pl: 3 }}>{exercise.objectives.map((objective) => <li key={objective.id}><Link component="button" type="button" underline="hover" onClick={() => setSelectedObjective(objective)} sx={{ textAlign: 'left', overflowWrap: 'anywhere' }}>{objective.title}</Link></li>)}</Box> : <Typography color="text.secondary">None specified.</Typography>}</Box>
-          <Box><Typography variant="subtitle2">Participants</Typography><Typography>{exercise.participants.length}</Typography></Box>
+          {[
+            { label: 'Facilitator', people: exercise.participants.filter((person) => person.id === exercise.facilitator_id) },
+            { label: 'Assistant Facilitators', people: exercise.participants.filter((person) => exercise.assistant_facilitator_ids.includes(person.id)) },
+            ...(Object.keys(injectRoleLabels) as InjectRole[]).map((role) => ({ label: participantRoleLabels[role], people: exercise.participants.filter((person) => person.role === role) })),
+          ].filter(({ people }) => people.length > 0).map(({ label, people }) => <Box key={label}>
+            <Typography variant="subtitle2">{label}</Typography>
+            <Box component="ul" sx={{ m: 0, pl: 3, overflowWrap: 'anywhere' }}>{people.map((person) => <li key={person.id}>{person.first_name} {person.last_name}</li>)}</Box>
+          </Box>)}
           </Stack>
           <Box sx={{ flexGrow: 1 }} />
           <IconButton aria-label={scenarioOpen ? 'Collapse exercise details' : 'Expand exercise details'} aria-expanded={scenarioOpen} aria-controls="scenario-details" onClick={() => setScenarioOpen((open) => !open)} sx={{ alignSelf: 'flex-start', borderRadius: 999, justifyContent: 'flex-start', m: 0.25, width: scenarioOpen ? 'calc(100% - 4px)' : 40 }}>{scenarioOpen ? <ChevronLeftIcon /> : <ChevronRightIcon />}</IconButton>
         </Paper>
-        <Paper component="section" aria-labelledby="exercise-feed-heading" variant="outlined" sx={{ p: 2, minWidth: 0 }}><Stack spacing={2}>
-        <Typography id="exercise-feed-heading" variant="h6">Exercise feed</Typography>
+        <Paper component="section" id="event-feed-panel" role="tabpanel" aria-labelledby={selectedEvent ? `event-tab-${selectedEvent.id}` : 'exercise-feed-heading'} variant="outlined" sx={{ p: 2, minWidth: 0 }}><Stack spacing={2}>
+        <Typography id="exercise-feed-heading" variant="h6">Feed</Typography>
         {facilitator && <Paper variant="outlined" sx={{ p: 2 }}><Stack spacing={2}>
-          <Typography variant="h6">Send an inject</Typography>
-          {pending.length === 0 && <Typography color="text.secondary">No injects are waiting to be sent.</Typography>}
-          {pending.map(({ event, inject }) => <Stack key={inject.id} direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: { sm: 'center' } }}><Box sx={{ flex: 1 }}><Typography>Event {event.number} · Inject {inject.number}</Typography><Typography color="text.secondary">{inject.message}</Typography></Box><Button disabled={saving} variant="contained" onClick={() => void post(`${url}events/${event.id}/injects/${inject.id}/send/`)}>Send card</Button></Stack>)}
+          <Typography variant="h6">Events and injects</Typography>
+          <Typography color="text.secondary">Make an inject visible to show it and its event in the exercise feed.</Typography>
+          {exercise.events.length === 0 && <Typography color="text.secondary">No events have been added.</Typography>}
+          {selectedEvent && [selectedEvent].map((event) => <Paper key={event.id} variant="outlined" sx={{ p: 2 }}><Stack spacing={2}>
+            <Box><Typography variant="subtitle1">Event {event.number}</Typography><Typography sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{event.description}</Typography></Box>
+            {event.injects.length === 0 && <Typography color="text.secondary">No injects have been added to this event.</Typography>}
+            {event.injects.map((inject) => <Paper key={inject.id} variant="outlined" sx={{ p: 2, position: 'relative' }}><Box sx={{ position: 'absolute', top: 16, right: 16 }}><InjectDeliveryMethod method={inject.delivery_method} /></Box><Stack spacing={1}>
+              <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap', pr: 4 }}><Typography variant="subtitle2">Inject {inject.number}</Typography><Chip size="small" color={inject.ended_at && inject.started_at ? 'success' : 'default'} label={inject.ended_at && inject.started_at ? 'Resolved' : inject.started_at ? 'Visible in feed' : 'Not in feed'} /></Stack>
+              <Typography color="text.secondary">From: {injectRoleLabels[inject.sender]} · To: {injectRoleLabels[inject.recipient]}</Typography>
+              <Typography sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{inject.message}</Typography>
+              {inject.expected_response && <Typography color="text.secondary" sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>Expected response: {inject.expected_response}</Typography>}
+              {!inject.started_at && <Button disabled={saving} variant="contained" sx={{ alignSelf: 'flex-start' }} onClick={() => void post(`${url}events/${event.id}/injects/${inject.id}/send/`)}>Make visible</Button>}
+              {inject.started_at && !inject.ended_at && <Button disabled={saving} variant="contained" sx={{ alignSelf: 'flex-start' }} onClick={() => void post(`${url}events/${event.id}/injects/${inject.id}/resolve/`)}>Mark resolved</Button>}
+            </Stack></Paper>)}
+          </Stack></Paper>)}
         </Stack></Paper>}
-        {sent.length === 0 && <Alert severity="info">No inject cards have been sent yet.</Alert>}
-        {sent.map(({ event, inject }) => <Paper key={inject.id} variant="outlined" sx={{ p: 2 }}><Stack spacing={2}>
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}><Chip color="primary" size="small" label="Inject" /><Typography variant="subtitle1">Event {event.number} · Inject {inject.number}</Typography><Typography color="text.secondary" variant="caption">{new Date(inject.started_at!).toLocaleString()}</Typography></Stack>
+        {selectedEvent && sent.length === 0 && <Alert severity="info">No inject cards have been sent for this event yet.</Alert>}
+        {sent.map(({ event, inject }) => <Paper key={inject.id} variant="outlined" sx={{ p: 2, position: 'relative' }}><Box sx={{ position: 'absolute', top: 16, right: 16 }}><InjectDeliveryMethod method={inject.delivery_method} /></Box><Stack spacing={2}>
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap', pr: 4 }}><Chip color="primary" size="small" label="Inject" /><Typography variant="subtitle1">Event {event.number} · Inject {inject.number}</Typography><Typography color="text.secondary" variant="caption">{new Date(inject.started_at!).toLocaleString()}</Typography></Stack>
           <Typography color="text.secondary">{event.description}</Typography>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 0.5, sm: 3 }}>
             <Typography><strong>From:</strong> {injectRoleLabels[inject.sender]}</Typography>
@@ -161,7 +193,7 @@ export function ExerciseRun({ exerciseId }: { exerciseId: string }) {
         </>}
         </Stack></Paper>
         <Paper component="section" aria-labelledby="exercise-chat-heading" variant="outlined" sx={{ p: 2, minWidth: 0 }}><Stack spacing={2}>
-          <Typography id="exercise-chat-heading" variant="h6">Exercise chat</Typography>
+          <Typography id="exercise-chat-heading" variant="h6">Chat</Typography>
           {chatError && <Alert severity="warning">{chatError}</Alert>}
           <Stack spacing={2} sx={{ maxHeight: { xs: 360, lg: "55vh" }, overflowY: "auto" }}>
           {messages.length === 0 && <Typography color="text.secondary">No messages yet.</Typography>}

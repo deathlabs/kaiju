@@ -39,9 +39,22 @@ make dev
 
 The target starts PostgreSQL in Docker and applies the current database migrations. It creates or updates the local development exercise and participants. Repeated runs do not create duplicate records. The target runs the backend and frontend from source.
 
-Open the frontend at `http://localhost:5173`. Open the backend at `http://localhost:8000`.
+The seed removes obsolete sample participants that have no responses. If an obsolete participant has responses or is the primary facilitator, the seed stops. It also stops if other existing participants would exceed a role limit. Resolve those records before you run the seed again.
 
-Local development generates a signed token for `Vic Fernandez III`. The frontend proxy adds the token to API requests.
+Open the backend at `http://localhost:8000`. Each frontend uses a signed token for one seeded participant. The default ports are:
+
+| Port | Role                 | Participant       |
+| ---- | -------------------- | ----------------- |
+| 5173 | Facilitator          | Justin Hartung    |
+| 6001 | ISO                  | Daisuke Serizawa  |
+| 6002 | ISSM                 | Vic Fernandez III      |
+| 6003 | ISSO                 | Shinichi Ozaki    |
+| 6004 | System administrator | Kiriko Tsujimori  |
+| 6005 | User                 | Hiroshi Jinkawa   |
+| 6006 | CSSP                 | Rando Yaguchi     |
+| 6007 | OPFOR                | Yoji Akitsu       |
+
+The script skips ports that are in use and prints the actual address for each participant. Open each address to use that participant's token. The seed command adds these participants to the seeded exercises. Add them to other exercises before testing participant features.
 
 Set `DEV_AUTH_DISABLED=1` to test unauthenticated API requests.
 

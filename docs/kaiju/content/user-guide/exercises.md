@@ -14,3 +14,13 @@ An exercise moves through the following states:
 
 **Step 4.** Completed
 
+## Exercise Timeline
+
+The exercise timeline shows a tab for each event above the exercise panels. Select an event tab to show its injects in the feed.
+
+Future event tabs are disabled until all injects in the preceding events are released and resolved.
+
+An event is upcoming until a facilitator releases an inject. It is in progress after an inject is released. When all injects are released and resolved, the event is complete. An event with no injects remains upcoming.
+
+After a facilitator releases an inject, select **Mark resolved** when the expected response is complete.
+

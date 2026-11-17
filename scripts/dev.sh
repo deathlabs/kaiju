@@ -48,13 +48,14 @@ docker compose --profile database up -d --wait
 
 # Set the backend and frontend process identifiers.
 backend_pid=""
-frontend_pid=""
+frontend_pids=""
 
 # Create the signed local token and its public key.
 uv run --project "$BACKEND_BUILD_CONTEXT/$APP" \
 	python scripts/auth.py \
 		--issuer "$AUTH_ISSUER" \
-		--audience "$AUTH_AUDIENCE"
+		--audience "$AUTH_AUDIENCE" \
+		--multiple
 
 # Stop the application processes.
 cleanup() {
@@ -64,9 +65,9 @@ cleanup() {
 		kill "$backend_pid" 2>/dev/null || true
 	fi
 
-	if [ -n "$frontend_pid" ]; then
+	for frontend_pid in $frontend_pids; do
 		kill "$frontend_pid" 2>/dev/null || true
-	fi
+	done
 
 	wait 2>/dev/null || true
 }
@@ -115,26 +116,69 @@ if [ ! -x "$FRONTEND_BUILD_CONTEXT/$APP/node_modules/.bin/vite" ]; then
 	(cd "$FRONTEND_BUILD_CONTEXT/$APP" && npm ci --include=dev)
 fi
 
-# Start the frontend development server.
-echo "[*] Starting $APP's frontend"
-(
-	. "${PWD}/.env"
-	if [ "${DEV_AUTH_DISABLED:-0}" = "1" ]; then
-		unset AUTH_TOKEN
-	fi
-	cd "$FRONTEND_BUILD_CONTEXT/$APP"
-	exec npm run dev
-) &
-frontend_pid=$!
+# Select distinct available ports for the frontend servers.
+ports="$(uv run --project "$BACKEND_BUILD_CONTEXT/$APP" python -c '
+import socket
+from itertools import chain
+
+sockets = []
+ports = []
+for port in chain([5173], range(6001, 65536)):
+    server = socket.socket()
+    try:
+        server.bind(("127.0.0.1", port))
+    except OSError:
+        server.close()
+        continue
+    sockets.append(server)
+    ports.append(port)
+    if len(ports) == 8:
+        break
+if len(ports) != 8:
+    raise SystemExit("Could not find eight available frontend ports.")
+print(*ports)
+')"
+set -- $ports
+
+# Start a frontend for each role with its own token.
+. "${PWD}/.env"
+start_frontend() {
+	role="$1"
+	port="$2"
+	token="$3"
+	(
+		if [ "${DEV_AUTH_DISABLED:-0}" = "1" ]; then
+			unset AUTH_TOKEN
+		else
+			AUTH_TOKEN="$token"
+			export AUTH_TOKEN
+		fi
+		cd "$FRONTEND_BUILD_CONTEXT/$APP"
+		exec ./node_modules/.bin/vite --host 127.0.0.1 --port "$port" --strictPort --clearScreen false --logLevel error
+	) &
+	frontend_pids="$frontend_pids $!"
+	echo "[*] $role: http://localhost:$port"
+}
+
+start_frontend "Facilitator (Justin Hartung)" "$1" "$AUTH_TOKEN_FACILITATOR"
+start_frontend "ISO (Daisuke Serizawa)" "$2" "$AUTH_TOKEN_ISO"
+start_frontend "ISSM (Vic Fernandez III)" "$3" "$AUTH_TOKEN_ISSM"
+start_frontend "ISSO (Shinichi Ozaki)" "$4" "$AUTH_TOKEN_ISSO"
+start_frontend "System administrator (Kiriko Tsujimori)" "$5" "$AUTH_TOKEN_SYSTEM_ADMINISTRATOR"
+start_frontend "User (Hiroshi Jinkawa)" "$6" "$AUTH_TOKEN_USER"
+start_frontend "CSSP (Rando Yaguchi)" "$7" "$AUTH_TOKEN_CSSP"
+start_frontend "OPFOR (Yoji Akitsu)" "$8" "$AUTH_TOKEN_OPFOR"
 
 # Wait until a development process exits.
-while kill -0 "$backend_pid" 2>/dev/null && kill -0 "$frontend_pid" 2>/dev/null; do
+while kill -0 "$backend_pid" 2>/dev/null; do
+	for frontend_pid in $frontend_pids; do
+		if ! kill -0 "$frontend_pid" 2>/dev/null; then
+			wait "$frontend_pid" || exit $?
+			exit 1
+		fi
+	done
 	sleep 0.1
 done
 
 # Preserve the status of the process that exited first.
-if ! kill -0 "$backend_pid" 2>/dev/null; then
-	wait "$backend_pid"
-else
-	wait "$frontend_pid"
-fi
+wait "$backend_pid"

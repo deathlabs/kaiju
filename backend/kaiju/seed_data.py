@@ -14,40 +14,20 @@ from django.db import transaction
 
 # Constants.
 PARTICIPANTS = (
-    ("Ishiro", "Serizawa", "facilitator"),
+    ("Justin", "Hartung", "facilitator"),
     ("Ilene", "Chen", "facilitator"),
     ("Ling", "Chen", "facilitator"),
-    ("Mark", "Russell", "facilitator"),
-    ("Emma", "Russell", "facilitator"),
-    ("Madison", "Russell", "facilitator"),
-    ("Ford", "Brody", "facilitator"),
-    ("Elle", "Brody", "facilitator"),
-    ("Joe", "Brody", "facilitator"),
-    ("Sandra", "Brody", "facilitator"),
     ("Daisuke", "Serizawa", "information_system_owner"),
-    ("Emiko", "Yamane", "information_system_owner"),
-    ("Hideto", "Ogata", "information_system_owner"),
-    ("Shinkichi", "Yamada", "information_system_owner"),
-    ("Miki", "Saegusa", "information_system_security_manager"),
-    ("Yuri", "Tachibana", "information_system_security_manager"),
-    ("Akane", "Yashiro", "information_system_security_manager"),
-    ("Sara", "Yuhara", "information_system_security_manager"),
+    ("Vic", "Fernandez III", "information_system_security_manager"),
     ("Shinichi", "Ozaki", "information_system_security_officer"),
     ("Miyuki", "Otonashi", "information_system_security_officer"),
     ("Douglas", "Gordon", "information_system_security_officer"),
     ("Kazuma", "Aoki", "information_system_security_officer"),
-    ("Azusa", "Gojo", "information_system_security_officer"),
-    ("Kenichiro", "Terasawa", "information_system_security_officer"),
-    ("Chiaki", "Morimura", "information_system_security_officer"),
-    ("Hajime", "Kudo", "information_system_security_officer"),
     ("Kiriko", "Tsujimori", "system_administrator"),
     ("Yuji", "Shinoda", "system_administrator"),
     ("Io", "Shinoda", "system_administrator"),
     ("Koichi", "Shikishima", "system_administrator"),
-    ("Noriko", "Oishi", "system_administrator"),
-    ("Sosaku", "Tachibana", "system_administrator"),
-    ("Kenji", "Noda", "system_administrator"),
-    ("Shiro", "Mizushima", "system_administrator"),
+    ("Hiroshi", "Jinkawa", "user"),
     ("Rando", "Yaguchi", "cybersecurity_service_provider"),
     ("Kayoko", "Patterson", "cybersecurity_service_provider"),
     ("Yoji", "Akitsu", "opposing_force"),
@@ -57,14 +37,30 @@ PARTICIPANTS = (
 )
 
 EXPECTED_ROLE_COUNTS = {
-    "facilitator": 10,
-    "information_system_owner": 4,
-    "information_system_security_manager": 4,
-    "information_system_security_officer": 8,
-    "system_administrator": 8,
+    "facilitator": 3,
+    "information_system_owner": 1,
+    "information_system_security_manager": 1,
+    "information_system_security_officer": 4,
+    "system_administrator": 4,
+    "user": 1,
     "cybersecurity_service_provider": 2,
     "opposing_force": 4,
 }
+
+OBSOLETE_PARTICIPANTS = {
+    "facilitator": ("mark.russell", "emma.russell", "madison.russell", "ford.brody", "elle.brody", "joe.brody", "sandra.brody"),
+    "information_system_owner": ("emiko.yamane", "hideto.ogata", "shinkichi.yamada"),
+    "information_system_security_manager": ("miki.saegusa", "yuri.tachibana", "akane.yashiro", "sara.yuhara"),
+    "information_system_security_officer": ("azusa.gojo", "kenichiro.terasawa", "chiaki.morimura", "hajime.kudo"),
+    "system_administrator": ("noriko.oishi", "sosaku.tachibana", "kenji.noda", "shiro.mizushima"),
+}
+
+
+def participant_email(first_name: str, last_name: str) -> str:
+    """Return the email address for a seeded participant."""
+    if (first_name, last_name) == ("Vic", "Fernandez III"):
+        return "victor@deathlabs.io"
+    return f"{first_name}.{last_name}@deathlabs.io".lower()
 
 # Each event contains its title, inject message, and expected response.
 ADDITIONAL_EXERCISES = (
@@ -219,15 +215,26 @@ def parse_args() -> argparse.Namespace:
 def seed_participants(exercise_id: UUID) -> tuple[int, int]:
     """Create or update the seed participants for one exercise."""
     from exercises.models import Exercise, Participant
+    from exercises.role_limits import ROLE_LIMITS
 
     exercise = Exercise.objects.get(id=exercise_id)
     created_count = 0
     updated_count = 0
 
     with transaction.atomic():
+        exercise = Exercise.objects.select_for_update().get(id=exercise_id)
+        obsolete_ids = []
+        for role, names in OBSOLETE_PARTICIPANTS.items():
+            emails = [f"{name}@deathlabs.io" for name in names]
+            obsolete_ids.extend(exercise.participants.filter(role=role, email__in=emails).values_list("id", flat=True))
+        obsolete = exercise.participants.filter(id__in=obsolete_ids)
+        if obsolete.filter(responses__isnull=False).exists() or exercise.facilitator_id in obsolete_ids:
+            raise RuntimeError("Cannot remove obsolete seed participants who have responses or are the facilitator.")
+        obsolete.delete()
+
         for first_name, last_name, role in PARTICIPANTS:
-            email = f"{first_name}.{last_name}@deathlabs.io".lower()
-            get_user_model().objects.update_or_create(
+            email = participant_email(first_name, last_name)
+            user, _ = get_user_model().objects.update_or_create(
                 username=f"{first_name} {last_name}",
                 defaults={
                     "email": email,
@@ -235,6 +242,17 @@ def seed_participants(exercise_id: UUID) -> tuple[int, int]:
                     "last_name": last_name,
                 },
             )
+            if role == "facilitator" and email == "justin.hartung@deathlabs.io":
+                old_participant = exercise.participants.filter(
+                    email="ishiro.serizawa@deathlabs.io", role=Participant.Role.FACILITATOR,
+                ).first()
+                if old_participant and not exercise.participants.filter(email=email).exists():
+                    old_participant.first_name = first_name
+                    old_participant.last_name = last_name
+                    old_participant.email = email
+                    if old_participant.user_id:
+                        old_participant.user = user
+                    old_participant.save(update_fields=["first_name", "last_name", "email", "user"])
             _, created = Participant.objects.update_or_create(
                 exercise=exercise,
                 email=email,
@@ -248,6 +266,10 @@ def seed_participants(exercise_id: UUID) -> tuple[int, int]:
                 created_count += 1
             else:
                 updated_count += 1
+
+        for role, limit in ROLE_LIMITS.items():
+            if exercise.participants.filter(role=role).count() > limit:
+                raise RuntimeError(f"Cannot seed exercise {exercise_id}: the {Participant.Role(role).label} role exceeds its limit of {limit}.")
 
     if exercise.facilitator_id is None:
         exercise.facilitator = (
