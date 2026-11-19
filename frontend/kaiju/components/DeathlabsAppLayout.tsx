@@ -15,6 +15,7 @@ export interface DeathlabsAppLayoutTopNavBar {
 }
 
 export interface DeathlabsAppLayoutSideNavBar {
+  defaultHref?: string
   items: readonly DeathlabsNavBarItem[]
 }
 
@@ -60,7 +61,7 @@ export const DeathlabsAppLayout = ({
       />
     </Box>
     <Box sx={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
-      <DeathlabsSideNavBar items={sideNavBar.items} />
+      <DeathlabsSideNavBar defaultHref={sideNavBar.defaultHref} items={sideNavBar.items} />
       <Box
         component="main"
         sx={{ flex: 1, minHeight: 0, minWidth: 0, overflow: 'auto' }}

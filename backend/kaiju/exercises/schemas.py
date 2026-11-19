@@ -92,6 +92,7 @@ class InjectSchema(Schema):
     updated_at: datetime
     scheduled_start_time: datetime
     started_at: datetime | None
+    is_visible: bool
     ended_at: datetime | None
     number: str
     delivery_method: Inject.DeliveryMethod
@@ -121,6 +122,7 @@ class InjectUpdateSchema(Schema):
     number: str | None = None
     scheduled_start_time: datetime | None = None
     started_at: datetime | None = None
+    is_visible: bool | None = None
     ended_at: datetime | None = None
     delivery_method: Inject.DeliveryMethod | None = None
     sender: Inject.Role | None = None
@@ -158,6 +160,12 @@ class EventOrderSchema(Schema):
     event_ids: list[UUID]
 
 
+class InjectOrderSchema(Schema):
+    """The inject IDs in display order."""
+
+    inject_ids: list[UUID]
+
+
 class EventUpdateSchema(Schema):
     """The fields that can be updated on an Event."""
 
@@ -176,6 +184,7 @@ class FindingSchema(Schema):
     id: UUID
     created_at: datetime
     created_by_id: int
+    created_by: ExerciseUserSchema
     updated_at: datetime
     type: Finding.Type
     topic: str
@@ -187,7 +196,7 @@ class FindingCreateSchema(Schema):
     """The fields required to create a Finding."""
 
     type: Finding.Type
-    topic: str
+    topic: Finding.Topic
     observation: str
     recommendation: str
 
@@ -196,7 +205,7 @@ class FindingUpdateSchema(Schema):
     """The fields that can be updated on a Finding."""
 
     type: Finding.Type | None = None
-    topic: str | None = None
+    topic: Finding.Topic | None = None
     observation: str | None = None
     recommendation: str | None = None
 

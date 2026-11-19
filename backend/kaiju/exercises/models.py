@@ -180,6 +180,7 @@ class Inject(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     scheduled_start_time = models.DateTimeField()
     started_at = models.DateTimeField(null=True, blank=True)
+    is_visible = models.BooleanField(default=False)
     ended_at = models.DateTimeField(null=True, blank=True)
     event = models.ForeignKey(
         Event,
@@ -187,6 +188,7 @@ class Inject(models.Model):
         on_delete=models.CASCADE,
     )
     number = models.CharField(max_length=10)
+    position = models.PositiveIntegerField(default=0)
     delivery_method = models.CharField(
         max_length=20,
         choices=DeliveryMethod.choices,
@@ -197,6 +199,7 @@ class Inject(models.Model):
     expected_response = models.TextField(blank=True)
 
     class Meta:
+        ordering = ["position", "number", "id"]
         constraints = (
             models.UniqueConstraint(
                 fields=["event", "number"],
@@ -231,6 +234,12 @@ class Finding(models.Model):
         SUSTAINMENT = "sustainment"
         IMPROVEMENT = "improvement"
 
+    class Topic(models.TextChoices):
+        POLICY = "Policy"
+        STANDARD = "Standard"
+        PROCEDURE = "Procedure"
+        GUIDELINE = "Guideline"
+
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(
@@ -240,7 +249,7 @@ class Finding(models.Model):
     )
     updated_at = models.DateTimeField(auto_now=True)
     type = models.CharField(max_length=20, choices=Type.choices)
-    topic = models.CharField(max_length=50)
+    topic = models.CharField(max_length=50, choices=Topic.choices)
     observation = models.TextField()
     recommendation = models.TextField()
     exercise = models.ForeignKey(

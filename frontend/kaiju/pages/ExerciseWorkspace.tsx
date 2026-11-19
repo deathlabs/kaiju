@@ -148,8 +148,6 @@ export function ExerciseWorkspace({ exerciseId, form, onClose }: ExerciseWorkspa
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState(0)
-  const [starting, setStarting] = useState(false)
-  const [startError, setStartError] = useState<string | null>(null)
   const [eventFormOpen, setEventFormOpen] = useState(false)
   const [editingEvent, setEditingEvent] = useState<ExerciseEvent | null>(null)
   const [eventForm, setEventForm] = useState<EventForm>({ number: '', description: '', newObjectives: [], objectiveIds: [] })
@@ -191,7 +189,6 @@ export function ExerciseWorkspace({ exerciseId, form, onClose }: ExerciseWorkspa
 
   useEffect(() => {
     setParticipantError(null)
-    setStartError(null)
     setParticipantFormOpen(false)
     if (exerciseId) {
       setTab(0)
@@ -201,25 +198,6 @@ export function ExerciseWorkspace({ exerciseId, form, onClose }: ExerciseWorkspa
       setTab(0)
     }
   }, [exerciseId, loadExercise])
-
-  const conductExercise = async () => {
-    if (!exerciseId || starting) return
-    setStarting(true)
-    setStartError(null)
-    try {
-      const response = await fetch(`/api/v1/exercises/${exerciseId}/`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'in_progress' }),
-      })
-      if (!response.ok) throw new Error(await getErrorMessage(response))
-      window.location.hash = `#exercises/${exerciseId}/run`
-    } catch (startFailure) {
-      setStartError(startFailure instanceof Error ? startFailure.message : 'Could not start the exercise.')
-    } finally {
-      setStarting(false)
-    }
-  }
 
   const openEventForm = (event?: ExerciseEvent) => {
     setEditingEvent(event ?? null)
@@ -326,6 +304,28 @@ export function ExerciseWorkspace({ exerciseId, form, onClose }: ExerciseWorkspa
       setExercise((current) => current?.id === exercise.id ? { ...current, events } : current)
     } catch (reorderError) {
       setError(reorderError instanceof Error ? reorderError.message : 'Could not reorder events.')
+    } finally {
+      setReordering(false)
+    }
+  }
+
+  const reorderInjects = async (event: ExerciseEvent, sourceIndex: number, targetIndex: number) => {
+    if (!exercise || reordering || targetIndex < 0 || targetIndex >= event.injects.length) return
+    const injects = [...event.injects]
+    const [inject] = injects.splice(sourceIndex, 1)
+    injects.splice(targetIndex, 0, inject)
+    setReordering(true)
+    setError(null)
+    try {
+      const response = await fetch(`/api/v1/exercises/${exercise.id}/events/${event.id}/injects/order/`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inject_ids: injects.map((item) => item.id) }),
+      })
+      if (!response.ok) throw new Error(await getErrorMessage(response))
+      setExercise((current) => current?.id === exercise.id ? { ...current, events: current.events.map((item) => item.id === event.id ? { ...item, injects } : item) } : current)
+    } catch (reorderError) {
+      setError(reorderError instanceof Error ? reorderError.message : 'Could not reorder injects.')
     } finally {
       setReordering(false)
     }
@@ -484,11 +484,10 @@ export function ExerciseWorkspace({ exerciseId, form, onClose }: ExerciseWorkspa
 
   return (
     <>
-      <Dialog fullWidth maxWidth="lg" onClose={form ? undefined : onClose} open={Boolean(exerciseId || form)}>
-        {startError && <Alert onClose={() => setStartError(null)} severity="error">{startError}</Alert>}
+      <Dialog fullWidth maxWidth="xl" onClose={form ? undefined : onClose} open={Boolean(exerciseId || form)} sx={{ '& .MuiDialog-container': { alignItems: 'flex-start' }, '& .MuiDialog-paper': { maxWidth: 1400 } }}>
         {form && tab === 0 ? (
           <>
-            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>Exercise{exerciseId && <Button disabled={starting} onClick={() => void conductExercise()} variant="contained">{starting ? 'Starting…' : 'Conduct exercise'}</Button>}</DialogTitle>
+            <DialogTitle>Exercise</DialogTitle>
             <Tabs onChange={(_, value: number) => setTab(value)} value={tab} sx={{ px: 3 }}>
               <Tab label="Overview" />
               <Tab disabled={!exerciseId} label="Participants" />
@@ -499,22 +498,25 @@ export function ExerciseWorkspace({ exerciseId, form, onClose }: ExerciseWorkspa
         ) : (
           <>
         <DialogTitle>Exercise</DialogTitle>
-        <DialogContent dividers>
+        <DialogContent>
           {loading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}><CircularProgress /></Box>
           ) : error ? (
             <Alert action={<Button color="inherit" onClick={() => void loadExercise()}>Retry</Button>} severity="error">{error}</Alert>
           ) : exercise ? (
             <>
-              <Tabs onChange={(_, value: number) => setTab(value)} value={tab}>
-                <Tab label="Overview" />
-                <Tab label="Participants" />
-                <Tab label="Master Scenario Event List" />
-              </Tabs>
+              <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                <Tabs onChange={(_, value: number) => setTab(value)} value={tab} variant="scrollable" scrollButtons="auto" sx={{ minWidth: 0, flexGrow: 1 }}>
+                  <Tab label="Overview" />
+                  <Tab label="Participants" />
+                  <Tab label="Master Scenario Event List" />
+                </Tabs>
+                {tab === 1 && <Button onClick={() => void openParticipantForm()} startIcon={<AddIcon />} sx={{ flexShrink: 0 }} variant="contained">Add participant</Button>}
+                {tab === 2 && <Button onClick={() => openEventForm()} startIcon={<AddIcon />} sx={{ flexShrink: 0 }} variant="contained">Add event</Button>}
+              </Stack>
               {tab === 1 && (
                 <Stack spacing={2} sx={{ pt: 3 }}>
                   {participantError && <Alert onClose={() => setParticipantError(null)} severity="error">{participantError}</Alert>}
-                  <Button onClick={() => void openParticipantForm()} startIcon={<AddIcon />} sx={{ alignSelf: 'flex-end' }} variant="contained">Add participant</Button>
                   <TableContainer component={Paper} variant="outlined">
                     <Table>
                       <TableHead><TableRow><TableCell>Name</TableCell><TableCell>Role</TableCell><TableCell>Email</TableCell><TableCell /></TableRow></TableHead>
@@ -536,24 +538,22 @@ export function ExerciseWorkspace({ exerciseId, form, onClose }: ExerciseWorkspa
               )}
               {tab === 2 && (
                 <Stack spacing={2} sx={{ pt: 3 }}>
-                  <Button onClick={() => openEventForm()} startIcon={<AddIcon />} sx={{ alignSelf: 'flex-end' }} variant="contained">Add event</Button>
                   {exercise.events.length === 0 ? <Paper sx={{ p: 4, textAlign: 'center' }} variant="outlined">No events have been added.</Paper> : exercise.events.map((event, index) => (
                     <Paper variant="outlined" key={event.id} sx={{ overflow: 'hidden' }}>
                       <Stack direction="row" spacing={2} sx={{ alignItems: 'center', p: 2 }}>
-                        <Typography variant="h6">Event {event.number}</Typography>
+                        <Typography variant="h6" sx={{ minWidth: 0, overflowWrap: 'anywhere' }}>Event {event.number}: <Typography component="span" variant="body1">{event.description}</Typography></Typography>
                         <Box sx={{ flexGrow: 1 }} />
                         <IconButton aria-label={`Move event ${event.number} up`} disabled={reordering || index === 0} onClick={() => void reorderEvents(event.id, index - 1)} size="small"><ArrowUpwardIcon /></IconButton>
                         <IconButton aria-label={`Move event ${event.number} down`} disabled={reordering || index === exercise.events.length - 1} onClick={() => void reorderEvents(event.id, index + 1)} size="small"><ArrowDownwardIcon /></IconButton>
-                        <IconButton aria-label={`Edit event ${event.number}`} onClick={() => openEventForm(event)}><EditIcon /></IconButton>
-                        <IconButton aria-label={`Delete event ${event.number}`} color="error" onClick={() => void deleteEvent(event)}><DeleteIcon /></IconButton>
+                        <IconButton sx={{ flexShrink: 0 }} aria-label={`Edit event ${event.number}`} onClick={() => openEventForm(event)}><EditIcon /></IconButton>
+                        <IconButton sx={{ flexShrink: 0 }} aria-label={`Delete event ${event.number}`} color="error" onClick={() => void deleteEvent(event)}><DeleteIcon /></IconButton>
                       </Stack>
-                      <Typography sx={{ px: 2, pb: 2 }}>{event.description}</Typography>
                       <TableContainer sx={{ border: 0, borderRadius: 0, '& tbody tr:last-child td': { borderBottom: 0 } }}>
-                        <Table size="small">
-                          <TableHead><TableRow><TableCell>Inject</TableCell><TableCell>Scheduled</TableCell><TableCell>Method</TableCell><TableCell>From</TableCell><TableCell>To</TableCell><TableCell>Message</TableCell><TableCell /></TableRow></TableHead>
+                        <Table size="small" sx={{ width: '100%', minWidth: 650 }}>
+                          <TableHead><TableRow><TableCell sx={{ width: '1%', whiteSpace: 'nowrap' }}>Inject ID</TableCell><TableCell sx={{ width: '1%', whiteSpace: 'nowrap' }}>Scheduled</TableCell><TableCell sx={{ width: '1%', whiteSpace: 'nowrap' }}>Method</TableCell><TableCell>From</TableCell><TableCell>To</TableCell><TableCell /></TableRow></TableHead>
                           <TableBody>
-                            {event.injects.map((inject) => <TableRow key={inject.id}><TableCell>{inject.number}</TableCell><TableCell>{new Date(inject.scheduled_start_time).toLocaleString()}</TableCell><TableCell><InjectDeliveryMethod method={inject.delivery_method} /></TableCell><TableCell>{injectRoleLabels[inject.sender]}</TableCell><TableCell>{injectRoleLabels[inject.recipient]}</TableCell><TableCell sx={{ maxWidth: 360 }}>{inject.message}</TableCell><TableCell><IconButton aria-label={`Edit inject ${inject.number}`} onClick={() => openInjectForm(event, inject)}><EditIcon /></IconButton><IconButton aria-label={`Delete inject ${inject.number}`} color="error" onClick={() => void deleteInject(event, inject)}><DeleteIcon /></IconButton></TableCell></TableRow>)}
-                            {event.injects.length === 0 && <TableRow><TableCell colSpan={7}>No injects have been added.</TableCell></TableRow>}
+                            {event.injects.map((inject, injectIndex) => <TableRow key={inject.id} hover onClick={() => openInjectForm(event, inject)} sx={{ cursor: 'pointer' }}><TableCell sx={{ width: '1%', whiteSpace: 'nowrap' }}>{inject.number}</TableCell><TableCell sx={{ width: '1%', whiteSpace: 'nowrap' }}>{new Date(inject.scheduled_start_time).toLocaleString()}</TableCell><TableCell sx={{ width: '1%', whiteSpace: 'nowrap' }}><InjectDeliveryMethod method={inject.delivery_method} /></TableCell><TableCell>{injectRoleLabels[inject.sender]}</TableCell><TableCell>{injectRoleLabels[inject.recipient]}</TableCell><TableCell align="right" onClick={(clickEvent) => clickEvent.stopPropagation()} sx={{ position: 'sticky', right: 0, zIndex: 1, backgroundColor: 'background.paper', whiteSpace: 'nowrap', width: '1%' }}><IconButton aria-label={`Move inject ${inject.number} up`} disabled={reordering || injectIndex === 0} onClick={() => void reorderInjects(event, injectIndex, injectIndex - 1)}><ArrowUpwardIcon /></IconButton><IconButton aria-label={`Move inject ${inject.number} down`} disabled={reordering || injectIndex === event.injects.length - 1} onClick={() => void reorderInjects(event, injectIndex, injectIndex + 1)}><ArrowDownwardIcon /></IconButton><IconButton aria-label={`Edit inject ${inject.number}`} onClick={() => openInjectForm(event, inject)}><EditIcon /></IconButton><IconButton aria-label={`Delete inject ${inject.number}`} color="error" onClick={() => void deleteInject(event, inject)}><DeleteIcon /></IconButton></TableCell></TableRow>)}
+                            {event.injects.length === 0 && <TableRow><TableCell colSpan={6}>No injects have been added.</TableCell></TableRow>}
                           </TableBody>
                         </Table>
                       </TableContainer>
@@ -564,7 +564,7 @@ export function ExerciseWorkspace({ exerciseId, form, onClose }: ExerciseWorkspa
             </>
           ) : null}
         </DialogContent>
-        <DialogActions sx={{ justifyContent: 'space-between' }}><Button color="inherit" onClick={onClose}>Cancel</Button><Button disabled={!exercise || starting} onClick={() => void conductExercise()} variant="contained">{starting ? 'Starting…' : 'Conduct exercise'}</Button></DialogActions>
+        <DialogActions><Button color="inherit" onClick={onClose}>Cancel</Button></DialogActions>
           </>
         )}
       </Dialog>
@@ -584,7 +584,7 @@ export function ExerciseWorkspace({ exerciseId, form, onClose }: ExerciseWorkspa
       </Dialog>
 
       <Dialog fullWidth maxWidth="sm" onClose={() => setEventFormOpen(false)} open={eventFormOpen}>
-        <Box component="form" onSubmit={saveEvent}><DialogTitle>{editingEvent ? 'Edit event' : 'Add event'}</DialogTitle><DialogContent><Stack spacing={2} sx={{ pt: 1 }}>{formError && <Alert severity="error">{formError}</Alert>}{editingEvent && <TextField label="Event number" onChange={(event) => setEventForm((form) => ({ ...form, number: event.target.value }))} required type="number" value={eventForm.number} />}<TextField label="Description" onChange={(event) => setEventForm((form) => ({ ...form, description: event.target.value }))} required value={eventForm.description} /><FormControl><InputLabel id="event-objectives-label">Objectives</InputLabel><Select label="Objectives" labelId="event-objectives-label" multiple onChange={(event) => {
+        <Box component="form" onSubmit={saveEvent}><DialogTitle>{editingEvent ? 'Edit event' : 'Add event'}</DialogTitle><DialogContent><Stack spacing={2} sx={{ pt: 1 }}>{formError && <Alert severity="error">{formError}</Alert>}{editingEvent && <TextField label="Event number" onChange={(event) => setEventForm((form) => ({ ...form, number: event.target.value }))} required type="number" value={eventForm.number} />}<TextField label="Event Name" onChange={(event) => setEventForm((form) => ({ ...form, description: event.target.value }))} required value={eventForm.description} /><FormControl><InputLabel id="event-objectives-label">Objectives</InputLabel><Select label="Objectives" labelId="event-objectives-label" multiple onChange={(event) => {
           const value = event.target.value
           const selectedValues = typeof value === 'string' ? value.split(',') : value
           if (selectedValues.includes(createObjectiveValue)) {
@@ -611,7 +611,7 @@ export function ExerciseWorkspace({ exerciseId, form, onClose }: ExerciseWorkspa
             <Typography sx={{ mb: 1 }}>Injects</Typography>
             <Stack spacing={1}>
               {editingEvent?.injects.map((inject) => <Typography key={inject.id} variant="body2">{inject.number}: {inject.message}</Typography>)}
-              {newInjects.map((inject) => <Chip key={inject.clientId} label={`${inject.number}: ${inject.message} (new)`} onDelete={() => setNewInjects((current) => current.filter((item) => item.clientId !== inject.clientId))} />)}
+              {newInjects.map((inject, index) => <Stack key={inject.clientId} direction="row" spacing={1} sx={{ alignItems: 'center' }}><Chip label={`${inject.number}: ${inject.message} (new)`} onDelete={() => setNewInjects((current) => current.filter((item) => item.clientId !== inject.clientId))} /><IconButton aria-label={`Move inject ${inject.number} up`} disabled={index === 0} onClick={() => setNewInjects((current) => { const items = [...current]; [items[index - 1], items[index]] = [items[index], items[index - 1]]; return items })}><ArrowUpwardIcon /></IconButton><IconButton aria-label={`Move inject ${inject.number} down`} disabled={index === newInjects.length - 1} onClick={() => setNewInjects((current) => { const items = [...current]; [items[index], items[index + 1]] = [items[index + 1], items[index]]; return items })}><ArrowDownwardIcon /></IconButton></Stack>)}
               <Button onClick={() => openInjectForm(editingEvent)} startIcon={<AddIcon />} sx={{ alignSelf: 'flex-start' }}>Add inject</Button>
             </Stack>
           </Box>

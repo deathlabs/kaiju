@@ -7,6 +7,7 @@ import FlagIcon from '@mui/icons-material/Flag'
 import HeadsetIcon from '@mui/icons-material/Headset'
 import MenuBookIcon from '@mui/icons-material/MenuBook'
 import { useEffect, useState } from 'react'
+import Typography from '@mui/material/Typography'
 
 import {
   DeathlabsAppLayout,
@@ -22,16 +23,17 @@ import { ObjectivesPage } from './pages/ObjectivesPage'
 import { ReferencesPage } from './pages/ReferencesPage'
 
 const sideNavBar = {
+  defaultHref: '#metrics',
   items: [
-    { name: 'Metrics', href: '#metrics', icon: <AnalyticsIcon /> },
     { name: 'Exercises', href: '#exercises', icon: <ContentPasteIcon /> },
-    { name: 'Objectives', href: '#objectives', icon: <FlagIcon /> },
     { name: 'References', href: '#references', icon: <AddLinkIcon /> },
+    { name: 'Objectives', href: '#objectives', icon: <FlagIcon /> },
+    { name: 'Metrics', href: '#metrics', icon: <AnalyticsIcon /> },
   ],
 }
 
 const topNavBar = {
-  title: 'Kaiju',
+  title: <Typography component="a" href="#exercises" variant="h6" sx={{ color: 'inherit', textDecoration: 'none' }}>Kaiju</Typography>,
   userMenu: [
     {
       name: 'User guide',

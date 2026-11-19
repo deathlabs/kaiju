@@ -2,6 +2,14 @@
 
 ## [0.1.0] - 2026-11-13
 ### Added
+- Added persistent inject reordering in the MSEL and widened the exercise modal in backend and frontend version 0.1.0. Both components remain at version 0.1.0 from version 0.1.0.
+- Added finding author details to backend and frontend version 0.1.0. Both components remain at version 0.1.0 from version 0.1.0.
+- Added a resolution status pill to inject cards in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Made injects visible when resolved in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Added gently pulsing status indicators beside exercise titles in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Made MSEL inject rows clickable to open the edit form, with the inject ID shown as plain text in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Added edit and delete icon actions to exercise cards and allowed users to open an exercise by selecting the card, including its bottom area, in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Added participant lists for inject sender and recipient roles in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 - Added an exercise timeline with event tabs and facilitator inject resolution to backend and frontend version 0.1.0. Future event tabs open after preceding injects are released and resolved. Both components remain at version 0.1.0 from version 0.1.0.
 - Added a user-role participant to the development exercise seed data in backend version 0.1.0. The backend remains at version 0.1.0 from version 0.1.0.
 - Added an event and inject list to the exercise run page. Facilitators can make injects visible in the participant feed. Frontend remains at version 0.1.0 from version 0.1.0.
@@ -31,6 +39,48 @@
 - Added objective creation from the event form to frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 
 ### Changed
+- Kept injects in their configured order when visibility changes in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Set Improvement as the default finding type in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Limited new and updated finding topics to Policy, Standard, Procedure, or Guideline in backend and frontend version 0.1.0. Both components remain at version 0.1.0 from version 0.1.0. Existing finding topics are preserved.
+- Added an Exercises breadcrumb with matching title styles and placed the timeline tabs below the page header in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Left-aligned the Add finding dialog buttons in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Renamed the Findings timeline tab to Conclusion in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Renamed the Opposing Force role to Red Team in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Removed event names and the Review label from the exercise timeline tabs and added space above tab content in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Removed the outer outline around the exercise timeline and tab content in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Moved exercise details to an Introduction tab with separate exercise, facilitator, and participant panels, references, and participant columns sized to their contents. Labeled the primary facilitator and kept personnel titles on one line. Placed system administrators and users together and Red Team separately from the cybersecurity service provider. Pluralized roles that can have multiple internal stakeholders in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Moved Add finding to the top of the exercise run page so all users can use it from any tab in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Displayed findings in a sortable table with search and type and topic filters in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Used the regular text color for unlocked events and the findings tab in the exercise timeline in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Allowed participants to open fully resolved events in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Updated the empty event message with a link to the facilitator in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Moved findings to a separate exercise timeline tab for all participants, with a Review label and an Add finding dialog in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Moved the sender and recipient below the inject ID on exercise run cards in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Placed the visibility and resolution switches together on inject cards in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Removed the divider lines from the Participants and MSEL tabs in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Aligned the Overview tabs with the other tabs and moved Cancel to the bottom right of the exercise modal in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Kept the exercise modal at a consistent top position across tabs in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Moved Add event and Add participant beside the exercise tabs in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Moved the event name beside the event number in the MSEL in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Renamed the event description field to Event Name in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Removed the Message column and sized the Inject ID, Scheduled, and Method columns to their contents and distributed the remaining MSEL inject table columns across the available width in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Kept MSEL edit and delete controls on the right and prevented them from shrinking in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Removed the Conduct exercise and Delete buttons from the exercise edit modal in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Removed the exercise type label and status pill from exercise cards in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Aligned exercise details at the top left and creature images on the right. Grouped exercise card actions at the bottom right with consistent icon colors. The frontend remains at version 0.1.0 from version 0.1.0.
+- Moved References above Objectives and Metrics to the end of the sidebar, and linked the Kaiju title to Exercises in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Placed inject card delivery, number, sender, recipient, and time on one line in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Added a divider between objectives and personnel in the scenario panel in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Updated the scenario panel heading and event tab labels to match objective card headings, and sized event tabs to keep their labels on one line in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Moved event tabs to the top of the feed panel, removed inject pills, placed delivery icons beside inject numbers and sender and recipient roles in the center of card headers, and timestamps at the top right in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Preserved inject release times when visibility changes in backend and frontend version 0.1.0. Both components remain at version 0.1.0 from version 0.1.0.
+- Combined the exercise feeds and added visibility and resolution controls for injects, with a tooltip that explains visibility, in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Flattened the facilitator feed to show injects for the selected event in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Allowed facilitators to select all event tabs in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Hid the facilitator feed from other participants in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Split the exercise run into facilitator and participant feeds in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Hid the chat panel on the exercise run page in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
+- Removed duplicate released injects and event details from inject cards, and added event descriptions below timeline tabs in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 - Limited exercise role assignments and updated the development roster in backend version 0.1.0. Reseeding removes obsolete seed participants when safe. The backend remains at version 0.1.0 from version 0.1.0.
 - Listed names under each role and separated start and end times in the exercise details panel in frontend version 0.1.0. The frontend remains at version 0.1.0 from version 0.1.0.
 - Added delivery method icons to injects in frontend version 0.1.0. Inject cards show the icon at the top right. The frontend remains at version 0.1.0 from version 0.1.0.

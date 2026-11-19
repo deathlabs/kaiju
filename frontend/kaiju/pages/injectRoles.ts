@@ -7,5 +7,5 @@ export const injectRoleLabels: Record<InjectRole, string> = {
   system_administrator: 'System Administrator',
   user: 'User',
   cybersecurity_service_provider: 'Cybersecurity Service Provider',
-  opposing_force: 'Opposing Force',
+  opposing_force: 'Red Team',
 }

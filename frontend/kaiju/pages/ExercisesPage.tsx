@@ -1,4 +1,6 @@
 import AddIcon from '@mui/icons-material/Add'
+import DeleteIcon from '@mui/icons-material/Delete'
+import EditIcon from '@mui/icons-material/Edit'
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth'
 import GroupsIcon from '@mui/icons-material/Groups'
 import SearchIcon from '@mui/icons-material/Search'
@@ -9,7 +11,6 @@ import Card from '@mui/material/Card'
 import CardActionArea from '@mui/material/CardActionArea'
 import CardContent from '@mui/material/CardContent'
 import Checkbox from '@mui/material/Checkbox'
-import Chip from '@mui/material/Chip'
 import CircularProgress from '@mui/material/CircularProgress'
 import Dialog from '@mui/material/Dialog'
 import DialogActions from '@mui/material/DialogActions'
@@ -19,6 +20,8 @@ import DialogTitle from '@mui/material/DialogTitle'
 import FormControl from '@mui/material/FormControl'
 import Grid from '@mui/material/Grid'
 import InputLabel from '@mui/material/InputLabel'
+import IconButton from '@mui/material/IconButton'
+import Tooltip from '@mui/material/Tooltip'
 import InputAdornment from '@mui/material/InputAdornment'
 import ListItemText from '@mui/material/ListItemText'
 import MenuItem from '@mui/material/MenuItem'
@@ -163,18 +166,18 @@ const statusLabels: Record<ExerciseStatus, string> = {
   completed: 'Completed',
 }
 
+const statusColors: Record<ExerciseStatus, string> = {
+  planned: 'text.secondary',
+  prepared: 'info.main',
+  in_progress: 'warning.main',
+  completed: 'success.main',
+}
+
 const statusOrder: Record<ExerciseStatus, number> = {
   in_progress: 0,
   prepared: 1,
   planned: 2,
   completed: 3,
-}
-
-const statusColors: Record<ExerciseStatus, 'default' | 'info' | 'warning' | 'success'> = {
-  planned: 'default',
-  prepared: 'info',
-  in_progress: 'warning',
-  completed: 'success',
 }
 
 const referenceTypeLabels: Record<ReferenceType, string> = {
@@ -258,6 +261,7 @@ export function ExercisesPage() {
   const [deletingExercise, setDeletingExercise] =
     useState<ExerciseSummary | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [startingExerciseId, setStartingExerciseId] = useState<string | null>(null)
 
   const loadExercises = useCallback(async (signal?: AbortSignal) => {
     setLoading(true)
@@ -458,10 +462,27 @@ export function ExercisesPage() {
     setNewReferenceDialogOpen(false)
   }
 
-  const openDeleteConfirmation = () => {
-    if (!editingExercise) return
+  const enterExercise = async (exercise: ExerciseSummary) => {
+    if (exercise.status === 'in_progress' || exercise.status === 'completed') {
+      window.location.hash = `#exercises/${exercise.id}/run`
+      return
+    }
 
-    setDeletingExercise(editingExercise)
+    setStartingExerciseId(exercise.id)
+    setPageError(null)
+    try {
+      const response = await fetch(`${exercisesUrl}${exercise.id}/`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'in_progress' }),
+      })
+      if (!response.ok) throw new Error(await getErrorMessage(response))
+      window.location.hash = `#exercises/${exercise.id}/run`
+    } catch (error) {
+      setPageError(error instanceof Error ? error.message : 'Could not start the exercise.')
+    } finally {
+      setStartingExerciseId(null)
+    }
   }
 
   const closeDeleteConfirmation = () => {
@@ -853,26 +874,23 @@ export function ExercisesPage() {
         <Grid container spacing={2}>
           {filteredExercises.map((exercise) => (
             <Grid key={exercise.id} size={{ xs: 12, md: 6, xl: 4 }}>
-              <Card variant="outlined">
+              <Card variant="outlined" sx={{ position: 'relative' }}>
                 <CardActionArea
-                  aria-label={`Open ${exercise.title}`}
-                  onClick={() => void openEditForm(exercise)}
+                  aria-label={`Open ${exercise.title}, ${statusLabels[exercise.status]}`}
+                  disabled={startingExerciseId !== null}
+                  onClick={() => void enterExercise(exercise)}
                 >
-                  <CardContent>
-                    <Stack
-                      direction="row"
-                      spacing={2}
-                      sx={{ justifyContent: 'space-between' }}
-                    >
-                      <Typography color="text.secondary" variant="caption">
-                        {typeLabels[exercise.type]}
+                  <CardContent sx={{ pb: '56px !important' }}>
+                    <Box sx={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', alignItems: 'start', gap: 1 }}>
+                    <Box sx={{ minWidth: 0 }}>
+                    <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                      <Typography component="h2" variant="h6">
+                        {exercise.title}
                       </Typography>
-                      <Chip color={statusColors[exercise.status]} label={statusLabels[exercise.status]} size="small" />
+                      <Tooltip title={statusLabels[exercise.status]}>
+                        <Box aria-hidden="true" sx={{ flexShrink: 0, width: 8, height: 8, borderRadius: '50%', color: statusColors[exercise.status], bgcolor: 'currentColor', boxShadow: '0 0 8px currentColor', animation: 'statusPulse 2.5s ease-in-out infinite', '@keyframes statusPulse': { '0%, 100%': { boxShadow: '0 0 4px currentColor', opacity: 0.7 }, '50%': { boxShadow: '0 0 10px currentColor', opacity: 1 } }, '@media (prefers-reduced-motion: reduce)': { animation: 'none' } }} />
+                      </Tooltip>
                     </Stack>
-                    <Box component="img" src={exerciseImage(exercise.id)} alt="" sx={{ float: 'right', width: { xs: 100, sm: 140 }, ml: 1, mt: 1 }} />
-                    <Typography component="h2" sx={{ mt: 2 }} variant="h6">
-                      {exercise.title}
-                    </Typography>
                     <Stack
                       direction="row"
                       spacing={1}
@@ -895,8 +913,15 @@ export function ExercisesPage() {
                         Facilitator: {exercise.participants.filter((participant) => participant.id === exercise.facilitator_id).map((participant) => `${participant.first_name} ${participant.last_name}`.trim() || 'Unnamed facilitator').join(', ') || 'None'}
                       </Typography>
                     </Stack>
+                    </Box>
+                    <Box component="img" src={exerciseImage(exercise.id)} alt="" sx={{ width: { xs: 80, sm: 140 }, maxWidth: '100%' }} />
+                    </Box>
                   </CardContent>
                 </CardActionArea>
+                <Stack direction="row" spacing={1} sx={{ position: 'absolute', right: 16, bottom: 8 }}>
+                  <Tooltip title="Edit"><IconButton aria-label={`Edit ${exercise.title}`} onClick={() => void openEditForm(exercise)}><EditIcon /></IconButton></Tooltip>
+                  <Tooltip title="Delete"><IconButton color="error" aria-label={`Delete ${exercise.title}`} onClick={() => setDeletingExercise(exercise)}><DeleteIcon /></IconButton></Tooltip>
+                </Stack>
               </Card>
             </Grid>
           ))}
@@ -1211,35 +1236,17 @@ export function ExercisesPage() {
           </DialogContent>
           <DialogActions
             sx={{
-              justifyContent: editingExercise ? 'space-between' : 'flex-start',
+              justifyContent: 'space-between',
               px: 3,
               pb: 3,
             }}
           >
-            <Stack direction="row" spacing={1}>
-              <Button
-                disabled={saving}
-                type="submit"
-                variant="contained"
-              >
-                {saving
-                  ? 'Saving…'
-                  : 'Save'}
-              </Button>
-              <Button color="inherit" disabled={saving} onClick={closeForm}>
-                Cancel
-              </Button>
-            </Stack>
-            {editingExercise && (
-              <Button
-                color="error"
-                disabled={saving}
-                onClick={openDeleteConfirmation}
-                variant="contained"
-              >
-                Delete
-              </Button>
-            )}
+            <Button disabled={saving} type="submit" variant="contained">
+              {saving ? 'Saving…' : 'Save'}
+            </Button>
+            <Button color="inherit" disabled={saving} onClick={closeForm}>
+              Cancel
+            </Button>
           </DialogActions>
         </Box>
         ) : null}

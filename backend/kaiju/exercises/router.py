@@ -4,7 +4,7 @@ from uuid import UUID
 # Third party imports.
 from django.contrib.auth import get_user_model
 from django.db import transaction
-from django.db.models import Max, QuerySet
+from django.db.models import Max, Prefetch, QuerySet
 from django.utils import timezone
 from ninja import Router, Status
 
@@ -38,6 +38,7 @@ from exercises.schemas import (
     FindingSchema,
     FindingUpdateSchema,
     InjectCreateSchema,
+    InjectOrderSchema,
     InjectSchema,
     InjectUpdateSchema,
     NotFoundResponseSchema,
@@ -192,7 +193,9 @@ def get_exercise(request, exercise_id: UUID):
     try:
         return Status(
             200,
-            Exercise.objects.select_related("created_by", "updated_by").get(
+            Exercise.objects.select_related("created_by", "updated_by").prefetch_related(
+                Prefetch("findings", queryset=Finding.objects.select_related("created_by")),
+            ).get(
                 id=exercise_id,
             ),
         )
@@ -595,7 +598,7 @@ def create_event(request, exercise_id: UUID, payload: EventCreateSchema):
     )
 
     event.objectives.set(objectives)
-    Inject.objects.bulk_create([Inject(event=event, **inject) for inject in new_inject_data])
+    Inject.objects.bulk_create([Inject(event=event, position=position, **inject) for position, inject in enumerate(new_inject_data)])
 
     return Status(201, event)
 
@@ -680,7 +683,7 @@ def update_event(
 ):
     """Update an event."""
     try:
-        event = Event.objects.get(
+        event = Event.objects.select_for_update().get(
             id=event_id,
             exercise_id=exercise_id,
         )
@@ -722,7 +725,9 @@ def update_event(
 
     if objective_ids is not None or new_objective_data:
         event.objectives.set(objectives)
-    Inject.objects.bulk_create([Inject(event=event, **inject) for inject in new_inject_data])
+    max_position = event.injects.aggregate(max_position=Max("position"))["max_position"]
+    next_position = 0 if max_position is None else max_position + 1
+    Inject.objects.bulk_create([Inject(event=event, position=next_position + position, **inject) for position, inject in enumerate(new_inject_data)])
 
     return Status(200, event)
 
@@ -756,6 +761,7 @@ def delete_event(request, exercise_id: UUID, event_id: UUID):
         404: NotFoundResponseSchema,
     },
 )
+@transaction.atomic
 def create_inject(
     request,
     exercise_id: UUID,
@@ -764,19 +770,44 @@ def create_inject(
 ):
     """Create an inject."""
     try:
-        event = Event.objects.get(
+        event = Event.objects.select_for_update().get(
             id=event_id,
             exercise_id=exercise_id,
         )
     except Event.DoesNotExist:
         return Status(404, {"message": "Event not found"})
 
+    max_position = event.injects.aggregate(max_position=Max("position"))["max_position"]
     inject = Inject.objects.create(
         event=event,
+        position=0 if max_position is None else max_position + 1,
         **payload.model_dump(),
     )
 
     return Status(201, inject)
+
+
+@exercises_router.put(
+    "/{exercise_id}/events/{event_id}/injects/order/",
+    response={204: None, 400: BadRequestResponseSchema, 404: NotFoundResponseSchema},
+)
+@transaction.atomic
+def reorder_injects(request, exercise_id: UUID, event_id: UUID, payload: InjectOrderSchema):
+    """Set the display order of all injects in an event."""
+    try:
+        event = Event.objects.select_for_update().get(id=event_id, exercise_id=exercise_id)
+    except Event.DoesNotExist:
+        return Status(404, {"message": "Event not found"})
+
+    injects = list(event.injects.all())
+    injects_by_id = {inject.id: inject for inject in injects}
+    if len(payload.inject_ids) != len(injects) or set(payload.inject_ids) != set(injects_by_id):
+        return Status(400, {"message": "Provide each inject in the event once"})
+
+    for position, inject_id in enumerate(payload.inject_ids):
+        injects_by_id[inject_id].position = position
+    Inject.objects.bulk_update(injects, ["position"])
+    return Status(204, None)
 
 
 @exercises_router.get(
@@ -850,6 +881,8 @@ def update_inject(
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(inject, field, value)
 
+    if inject.is_visible and inject.started_at is None:
+        inject.started_at = timezone.now()
     inject.save()
 
     return Status(200, inject)
@@ -894,6 +927,7 @@ def send_inject(request, exercise_id: UUID, event_id: UUID, inject_id: UUID):
     if not injects.exists():
         return Status(404, {"message": "Inject not found"})
     injects.filter(started_at__isnull=True).update(started_at=timezone.now())
+    injects.update(is_visible=True)
     return Status(200, injects.get())
 
 
@@ -926,6 +960,7 @@ def create_card_reply(request, exercise_id: UUID, event_id: UUID, inject_id: UUI
     inject = Inject.objects.filter(
         id=inject_id, event_id=event_id, event__exercise_id=exercise_id,
         started_at__isnull=False,
+        is_visible=True,
     ).first()
     if inject is None:
         return Status(404, {"message": "Sent inject not found"})
@@ -1124,7 +1159,7 @@ def list_findings(request, exercise_id: UUID):
 
     return Status(
         200,
-        Finding.objects.filter(exercise=exercise).order_by("created_at"),
+        Finding.objects.filter(exercise=exercise).select_related("created_by").order_by("created_at"),
     )
 
 

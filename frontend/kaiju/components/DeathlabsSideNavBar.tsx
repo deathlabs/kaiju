@@ -41,29 +41,31 @@ const DeathlabsStyledDrawer = styled(MuiDrawer, {
 }))
 
 export interface DeathlabsSideNavBarProps {
+  defaultHref?: string
   items: readonly DeathlabsNavBarItem[]
 }
 
-const getSelectedHref = (items: readonly DeathlabsNavBarItem[]) =>
+const getSelectedHref = (items: readonly DeathlabsNavBarItem[], defaultHref?: string) =>
   items.find((item) => item.href === window.location.hash || window.location.hash.startsWith(`${item.href}/`))?.href
-    ?? items[0]?.href
+    ?? defaultHref ?? items[0]?.href
 
 export const DeathlabsSideNavBar = ({
+  defaultHref,
   items,
 }: DeathlabsSideNavBarProps) => {
   const [open, setOpen] = useState(false)
   const [selectedHref, setSelectedHref] = useState(() =>
-    getSelectedHref(items),
+    getSelectedHref(items, defaultHref),
   )
   const sideNavWidth = open ? 220 : 52
 
   useEffect(() => {
-    const updateSelectedHref = () => setSelectedHref(getSelectedHref(items))
+    const updateSelectedHref = () => setSelectedHref(getSelectedHref(items, defaultHref))
 
     window.addEventListener('hashchange', updateSelectedHref)
 
     return () => window.removeEventListener('hashchange', updateSelectedHref)
-  }, [items])
+  }, [items, defaultHref])
 
   return (
     <DeathlabsStyledDrawer sideNavWidth={sideNavWidth} variant="permanent">

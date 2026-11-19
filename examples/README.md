@@ -23,7 +23,7 @@ At 0400 EST on 2026-02-26 (Friday), unknown anomalous outbound network activity 
 
 This table will serve as the TTX's Master Scenario Event List (MSEL). 
 
-| Event Number | Event Description | Expected Actions | Related Objectives |
+| Event Number | Event Name | Expected Actions | Related Objectives |
 |-------------|------------------|------------------|-------------------| 
 | 1 | Detect | O-ISSM is notified, IRT is activated, initial triage is performed | O1, O2, O4 | 
 | 2 | Respond | Containment and eradication procedures are performed according to the IRP | O1, O2, O3, O4 | 

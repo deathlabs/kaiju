@@ -14,9 +14,15 @@ An exercise moves through the following states:
 
 **Step 4.** Completed
 
+## Event Name
+
+Each event has an Event Name. Enter it when you add or edit an event.
+
 ## Exercise Timeline
 
-The exercise timeline shows a tab for each event above the exercise panels. Select an event tab to show its injects in the feed.
+The exercise timeline shows a tab for each event in the feed panel. Select an event tab to show its injects in the feed.
+
+Select a sender or recipient role on an inject card to see its assigned participants.
 
 Future event tabs are disabled until all injects in the preceding events are released and resolved.
 
