@@ -24,7 +24,7 @@ The exercise timeline shows a tab for each event in the feed panel. Select an ev
 
 Select a sender or recipient role on an inject card to see its assigned participants.
 
-Future event tabs are disabled until all injects in the preceding events are released and resolved.
+All event tabs are available. Injects that a facilitator has not made visible appear as locked cards to participants.
 
 An event is upcoming until a facilitator releases an inject. It is in progress after an inject is released. When all injects are released and resolved, the event is complete. An event with no injects remains upcoming.
 

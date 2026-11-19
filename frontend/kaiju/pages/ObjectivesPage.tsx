@@ -90,6 +90,7 @@ const formatSchedule = (start: string, end: string) => {
   }).format(startDate)
   const time = new Intl.DateTimeFormat(undefined, {
     timeStyle: 'short',
+    hourCycle: 'h23',
   })
 
   return `${date}, ${time.format(startDate)}–${time.format(endDate)}`

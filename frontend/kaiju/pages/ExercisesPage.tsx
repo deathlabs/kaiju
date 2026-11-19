@@ -65,6 +65,7 @@ interface ExerciseParticipant {
   id: string
   first_name: string
   last_name: string
+  email: string | null
   role: string
 }
 
@@ -208,6 +209,7 @@ const formatSchedule = (start: string, end: string) => {
   }).format(startDate)
   const time = new Intl.DateTimeFormat(undefined, {
     timeStyle: 'short',
+    hourCycle: 'h23',
   })
 
   return `${date}, ${time.format(startDate)}–${time.format(endDate)}`
@@ -231,6 +233,7 @@ export function ExercisesPage() {
   const [references, setReferences] = useState<Reference[]>([])
   const [users, setUsers] = useState<SelectableUser[]>([])
   const [currentUsername, setCurrentUsername] = useState('')
+  const [currentEmail, setCurrentEmail] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [typeFilters, setTypeFilters] = useState<ExerciseType[]>([])
   const [objectiveFilterIds, setObjectiveFilterIds] = useState<string[]>([])
@@ -301,9 +304,9 @@ export function ExercisesPage() {
       setExercises((await exercisesResponse.json()) as ExerciseSummary[])
       setObjectives((await objectivesResponse.json()) as Objective[])
       setReferences((await referencesResponse.json()) as Reference[])
-      setCurrentUsername(
-        ((await currentUserResponse.json()) as SelectableUser).username,
-      )
+      const currentUser = (await currentUserResponse.json()) as SelectableUser & { email: string }
+      setCurrentUsername(currentUser.username)
+      setCurrentEmail(currentUser.email)
       setUsers((await usersResponse.json()) as SelectableUser[])
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return
@@ -880,7 +883,7 @@ export function ExercisesPage() {
                   disabled={startingExerciseId !== null}
                   onClick={() => void enterExercise(exercise)}
                 >
-                  <CardContent sx={{ pb: '56px !important' }}>
+                  <CardContent sx={{ pb: '64px !important' }}>
                     <Box sx={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', alignItems: 'start', gap: 1 }}>
                     <Box sx={{ minWidth: 0 }}>
                     <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
@@ -918,10 +921,10 @@ export function ExercisesPage() {
                     </Box>
                   </CardContent>
                 </CardActionArea>
-                <Stack direction="row" spacing={1} sx={{ position: 'absolute', right: 16, bottom: 8 }}>
+                {currentEmail && exercise.participants.some((participant) => participant.role === 'facilitator' && participant.email?.toLowerCase() === currentEmail.toLowerCase()) && <Stack direction="row" spacing={1} sx={{ position: 'absolute', right: 16, bottom: 8 }}>
                   <Tooltip title="Edit"><IconButton aria-label={`Edit ${exercise.title}`} onClick={() => void openEditForm(exercise)}><EditIcon /></IconButton></Tooltip>
                   <Tooltip title="Delete"><IconButton color="error" aria-label={`Delete ${exercise.title}`} onClick={() => setDeletingExercise(exercise)}><DeleteIcon /></IconButton></Tooltip>
-                </Stack>
+                </Stack>}
               </Card>
             </Grid>
           ))}
@@ -931,7 +934,7 @@ export function ExercisesPage() {
       <ExerciseWorkspace
         exerciseId={workspaceExercise?.id ?? null}
         form={formOpen ? (
-        <Box component="form" onSubmit={saveExercise}>
+        <Box component="form" id="exercise-overview-form" onSubmit={saveExercise}>
           <DialogContent>
             {formError && (
               <Alert severity="error" sx={{ mb: 2 }}>

@@ -1,10 +1,13 @@
 import AddIcon from '@mui/icons-material/Add'
+import ExpandLessIcon from '@mui/icons-material/ExpandLess'
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
+import LockIcon from '@mui/icons-material/Lock'
 import SearchIcon from '@mui/icons-material/Search'
 import { injectRoleLabels, type InjectRole } from './injectRoles'
 import { InjectDeliveryMethod, type DeliveryMethod } from './InjectDeliveryMethod'
 import { DeathlabsPageHeader } from '../components/DeathlabsPageHeader'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { Alert, Box, Button, Checkbox, Chip, CircularProgress, FormControl, FormControlLabel, Dialog, DialogActions, DialogContent, DialogTitle, Divider, InputAdornment, InputLabel, Link, ListItemText, MenuItem, Paper, Select, Stack, Switch, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TableSortLabel, Tabs, TextField, Tooltip, Typography } from '@mui/material'
+import { Alert, Box, Button, Checkbox, Chip, CircularProgress, Collapse, FormControl, FormControlLabel, Dialog, DialogActions, DialogContent, DialogTitle, Divider, IconButton, InputAdornment, InputLabel, Link, ListItemText, MenuItem, Paper, Select, Stack, Switch, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TableSortLabel, Tabs, TextField, Tooltip, Typography } from '@mui/material'
 
 type ParticipantRole = InjectRole | 'facilitator'
 interface Participant { id: string; first_name: string; last_name: string; email: string | null; role: ParticipantRole }
@@ -31,7 +34,6 @@ export function ExerciseRun({ exerciseId }: { exerciseId: string }) {
   const showChat = false
   const [selectedObjective, setSelectedObjective] = useState<Objective | null>(null)
   const [selectedRole, setSelectedRole] = useState<InjectRole | null>(null)
-  const [facilitatorOpen, setFacilitatorOpen] = useState(false)
   const [selectedEventId, setSelectedEventId] = useState<string | null>('introduction')
   const [exercise, setExercise] = useState<Exercise | null>(null)
   const [user, setUser] = useState<CurrentUser | null>(null)
@@ -42,6 +44,7 @@ export function ExerciseRun({ exerciseId }: { exerciseId: string }) {
   const [chatError, setChatError] = useState<string | null>(null)
   const [sendingChat, setSendingChat] = useState(false)
   const [replyTo, setReplyTo] = useState('')
+  const [collapsedInjectIds, setCollapsedInjectIds] = useState<string[]>([])
   const [replyType, setReplyType] = useState<'response' | 'question'>('response')
   const [replyText, setReplyText] = useState('')
   const [findingOpen, setFindingOpen] = useState(false)
@@ -97,12 +100,11 @@ export function ExerciseRun({ exerciseId }: { exerciseId: string }) {
   }
   const participant = user?.email && exercise?.participants.find((item) => item.email?.toLowerCase() === user.email.toLowerCase())
   const facilitator = participant && participant.role === 'facilitator'
-  const availableEvents = exercise?.events.filter((event, index, events) => (event.injects.length > 0 && event.injects.every((inject) => inject.ended_at)) || events.slice(0, index).every((previous) => previous.injects.length > 0 && previous.injects.every((inject) => inject.started_at && inject.ended_at))) ?? []
-  const selectableEvents = facilitator ? exercise?.events ?? [] : availableEvents
+  const selectableEvents = exercise?.events ?? []
   const introductionSelected = selectedEventId === 'introduction'
   const findingsSelected = selectedEventId === 'findings'
   const selectedEvent = introductionSelected || findingsSelected ? undefined : selectableEvents.find((event) => event.id === selectedEventId) ?? selectableEvents[0]
-  const sent = (selectedEvent?.injects ?? []).filter((inject) => facilitator || inject.is_visible).map((inject) => ({ event: selectedEvent!, inject }))
+  const sent = (selectedEvent?.injects ?? []).map((inject) => ({ event: selectedEvent!, inject }))
   const filteredFindings = (exercise?.findings ?? []).filter((item) => {
     const author = findingAuthor(item)
     return (!findingTypes.length || findingTypes.includes(item.type)) && (!findingTopics.length || findingTopics.includes(item.topic)) && [item.type, item.topic, item.observation, item.recommendation, author].join(' ').toLocaleLowerCase().includes(findingSearch.trim().toLocaleLowerCase())
@@ -167,7 +169,7 @@ export function ExerciseRun({ exerciseId }: { exerciseId: string }) {
           <Box sx={{ overflowX: 'auto' }}><Box sx={{ width: 'max-content', minWidth: '100%' }}>
           <Tabs value={introductionSelected ? 'introduction' : findingsSelected ? 'findings' : selectedEvent?.id ?? 'introduction'} onChange={(_, value: string) => { setSelectedEventId(value); setReplyTo('') }} variant="standard" aria-label="Exercise timeline" sx={{ '& .MuiTabs-list': { width: 'max-content', mx: 'auto' } }}>
               <Tab value="introduction" id="introduction-tab" aria-controls="event-feed-panel" label={<Typography component="span" role="heading" aria-level={2} variant="h6">Introduction</Typography>} sx={{ minWidth: 0, px: 2, color: 'text.primary' }} />
-              {exercise.events.map((event) => <Tab key={event.id} value={event.id} id={`event-tab-${event.id}`} aria-controls="event-feed-panel" disabled={!selectableEvents.some((available) => available.id === event.id)} label={<Typography component="span" role="heading" aria-level={2} variant="h6" sx={{ whiteSpace: 'nowrap' }}>Event {event.number}</Typography>} sx={{ minWidth: 0, px: 2, color: 'text.primary', '&.Mui-disabled': { color: 'text.disabled' } }} />)}
+              {exercise.events.map((event) => <Tab key={event.id} value={event.id} id={`event-tab-${event.id}`} aria-controls="event-feed-panel" label={<Typography component="span" role="heading" aria-level={2} variant="h6" sx={{ whiteSpace: 'nowrap' }}>Event {event.number}</Typography>} sx={{ minWidth: 0, px: 2, color: 'text.primary' }} />)}
               <Tab value="findings" id="findings-tab" aria-controls="event-feed-panel" label={<Typography component="span" role="heading" aria-level={2} variant="h6">Conclusion</Typography>} sx={{ minWidth: 0, px: 2, color: 'text.primary' }} />
             </Tabs>
           </Box></Box>
@@ -179,8 +181,8 @@ export function ExerciseRun({ exerciseId }: { exerciseId: string }) {
             <Box><Typography variant="subtitle2">Scenario</Typography><Typography sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{exercise.scenario}</Typography></Box>
             <Box><Typography variant="subtitle2">Type</Typography><Typography>{exercise.type === 'discussion_and_hands_on' ? 'Discussion and Hands-On' : 'Discussion'}</Typography></Box>
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(2, minmax(0, 1fr))' }, gap: 2 }}>
-              <Box><Typography variant="subtitle2">Start Time</Typography><Typography>{new Date(exercise.scheduled_start_time).toLocaleString()}</Typography></Box>
-              <Box><Typography variant="subtitle2">End Time</Typography><Typography>{new Date(exercise.scheduled_end_time).toLocaleString()}</Typography></Box>
+              <Box><Typography variant="subtitle2">Start Time</Typography><Typography>{new Date(exercise.scheduled_start_time).toLocaleString(undefined, { hourCycle: 'h23' })}</Typography></Box>
+              <Box><Typography variant="subtitle2">End Time</Typography><Typography>{new Date(exercise.scheduled_end_time).toLocaleString(undefined, { hourCycle: 'h23' })}</Typography></Box>
             </Box>
             <Box><Typography variant="subtitle2">References</Typography>{exercise.references.length ? <Box component="ul" sx={{ m: 0, pl: 3, overflowWrap: 'anywhere' }}>{exercise.references.map((reference) => <li key={reference.id}><Link href={reference.url} target="_blank" rel="noopener noreferrer">{reference.title}</Link></li>)}</Box> : <Typography color="text.secondary">None specified.</Typography>}</Box>
             <Box><Typography variant="subtitle2">Objectives</Typography>{exercise.objectives.length ? <Box component="ul" sx={{ m: 0, pl: 3 }}>{exercise.objectives.map((objective) => <li key={objective.id}><Link component="button" type="button" underline="hover" onClick={() => setSelectedObjective(objective)} sx={{ textAlign: 'left', overflowWrap: 'anywhere' }}>{objective.title}</Link></li>)}</Box> : <Typography color="text.secondary">None specified.</Typography>}</Box>
@@ -210,29 +212,34 @@ export function ExerciseRun({ exerciseId }: { exerciseId: string }) {
           </Stack>)}
           </Box></Paper>
         </Box>}
-        {selectedEvent && sent.length === 0 && <Alert severity="info">The <Link component="button" type="button" onClick={() => setFacilitatorOpen(true)} sx={{ verticalAlign: 'baseline' }}>facilitator</Link> has not started this event yet.</Alert>}
-        {sent.map(({ event, inject }) => <Paper key={inject.id} variant="outlined" sx={{ p: 2 }}><Stack spacing={2}>
+        {selectedEvent && sent.length === 0 && <Alert severity="info">No injects have been added to this event.</Alert>}
+        {sent.map(({ event, inject }) => {
+          const locked = !facilitator && !inject.is_visible
+          const collapsed = locked || collapsedInjectIds.includes(inject.id)
+          return <Paper key={inject.id} variant="outlined" sx={{ p: 2 }}><Stack spacing={2}>
           <Stack direction="row" spacing={2} sx={{ alignItems: 'center', overflowX: 'auto', whiteSpace: 'nowrap' }}>
-            <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}><InjectDeliveryMethod method={inject.delivery_method} /><Typography variant="subtitle1">Inject {inject.number}</Typography></Stack>
-            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', ml: 'auto !important' }}>
-              {inject.started_at && <Typography color="text.secondary" variant="caption">{new Date(inject.started_at).toLocaleString()}</Typography>}
-              <Chip size="small" label={inject.ended_at ? 'Resolved' : 'Unresolved'} color={inject.ended_at ? 'success' : 'default'} />
-            </Stack>
+            <Typography variant="subtitle1">Inject {inject.number}</Typography>
+            <Box sx={{ flexGrow: 1 }} />
+            <Chip size="small" label={inject.ended_at ? 'Resolved' : 'Unresolved'} color={inject.ended_at ? 'success' : 'default'} />
+            <IconButton size="small" disabled={locked} aria-label={locked ? `Inject ${inject.number} is locked` : `${collapsed ? 'Expand' : 'Collapse'} inject ${inject.number}`} aria-expanded={!collapsed} aria-controls={collapsed ? undefined : `inject-content-${inject.id}`} onClick={() => setCollapsedInjectIds((current) => current.includes(inject.id) ? current.filter((id) => id !== inject.id) : [...current, inject.id])}>{locked ? <LockIcon /> : collapsed ? <ExpandMoreIcon /> : <ExpandLessIcon />}</IconButton>
           </Stack>
-          <Stack direction="row" spacing={2} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+          <Collapse in={!collapsed} unmountOnExit sx={collapsed ? { mt: '0 !important' } : undefined}><Stack id={`inject-content-${inject.id}`} spacing={2}>
+          <Divider />
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2 }}><Stack spacing={1}>
             <Typography><strong>From:</strong> <Link component="button" type="button" underline="hover" onClick={() => setSelectedRole(inject.sender)}>{injectRoleLabels[inject.sender]}</Link></Typography>
             <Typography><strong>To:</strong> <Link component="button" type="button" underline="hover" onClick={() => setSelectedRole(inject.recipient)}>{injectRoleLabels[inject.recipient]}</Link></Typography>
-          </Stack>
-          <Typography sx={{ whiteSpace: 'pre-wrap' }}>{inject.message}</Typography>
+          </Stack>{inject.started_at && <Typography color="text.secondary" variant="caption">{new Date(inject.started_at).toLocaleString(undefined, { hourCycle: 'h23' })}</Typography>}</Box>
+          <Typography sx={{ whiteSpace: 'pre-wrap', mt: '0 !important', '&::before': { content: '""', display: 'block', typography: 'subtitle1', height: '1lh' } }}>{inject.message}</Typography>
           {facilitator && inject.expected_response && <Typography color="text.secondary" sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>Expected response: {inject.expected_response}</Typography>}
-          {facilitator && <Stack direction="row" spacing={2} sx={{ alignItems: 'center', flexWrap: 'wrap' }}><Tooltip describeChild title="Show or hide this inject in the participant feed"><FormControlLabel label="Visible?" control={<Switch checked={inject.is_visible} disabled={saving} onChange={(e) => void post(`${url}events/${event.id}/injects/${inject.id}/`, { is_visible: e.target.checked }, 'PATCH')} />} /></Tooltip><FormControlLabel label="Resolved?" control={<Switch checked={!!inject.ended_at} disabled={saving} onChange={(e) => void post(`${url}events/${event.id}/injects/${inject.id}/`, { ended_at: e.target.checked ? new Date().toISOString() : null, ...(e.target.checked ? { is_visible: true } : {}) }, 'PATCH')} />} /></Stack>}
+          {facilitator && <Stack direction="row" spacing={2} sx={{ alignItems: 'center', flexWrap: 'wrap' }}><Tooltip describeChild title="Unlock or lock this inject for participants"><FormControlLabel label="Unlocked?" control={<Switch checked={inject.is_visible} disabled={saving} onChange={(e) => void post(`${url}events/${event.id}/injects/${inject.id}/`, { is_visible: e.target.checked }, 'PATCH')} />} /></Tooltip><FormControlLabel label="Resolved?" control={<Switch checked={!!inject.ended_at} disabled={saving} onChange={(e) => void post(`${url}events/${event.id}/injects/${inject.id}/`, { ended_at: e.target.checked ? new Date().toISOString() : null, ...(e.target.checked ? { is_visible: true } : {}) }, 'PATCH')} />} /></Stack>}
           {inject.started_at && <>
-          <Divider />
-          {inject.responses.map((reply) => <Paper key={reply.id} variant="outlined" sx={{ p: 2, ml: { sm: 3 } }}><Stack spacing={1}><Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}><Chip size="small" label={reply.type === 'question' ? 'Question' : 'Response'} /><Typography variant="subtitle2">{reply.participant.first_name} {reply.participant.last_name}</Typography><Typography color="text.secondary" variant="caption">{new Date(reply.created_at).toLocaleString()}</Typography></Stack><Typography sx={{ whiteSpace: 'pre-wrap' }}>{reply.text}</Typography></Stack></Paper>)}
+          {inject.responses.map((reply) => <Paper key={reply.id} variant="outlined" sx={{ p: 2, ml: { sm: 3 } }}><Stack spacing={1}><Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}><Chip size="small" label={reply.type === 'question' ? 'Question' : 'Response'} /><Typography variant="subtitle2">{reply.participant.first_name} {reply.participant.last_name}</Typography><Typography color="text.secondary" variant="caption">{new Date(reply.created_at).toLocaleString(undefined, { hourCycle: 'h23' })}</Typography></Stack><Typography sx={{ whiteSpace: 'pre-wrap' }}>{reply.text}</Typography></Stack></Paper>)}
           {replyTo !== inject.id && <Button sx={{ alignSelf: 'flex-start' }} onClick={() => { setReplyTo(inject.id); setReplyText(''); setReplyType('response') }}>Reply to card</Button>}
           {replyTo === inject.id && <Box component="form" onSubmit={(e) => void sendReply(e, event.id, inject.id)}><Stack spacing={2}><TextField select label="Card type" value={replyType} onChange={(e) => setReplyType(e.target.value as 'response' | 'question')}><MenuItem value="response">Response</MenuItem><MenuItem value="question">Question</MenuItem></TextField><TextField required multiline minRows={2} label="Message" value={replyText} onChange={(e) => setReplyText(e.target.value)} /><Stack direction="row" spacing={1}><Button type="submit" variant="contained" disabled={saving || !replyText.trim()}>Send reply</Button><Button onClick={() => setReplyTo('')}>Cancel</Button></Stack></Stack></Box>}
           </>}
-        </Stack></Paper>)}
+          <Box sx={{ alignSelf: 'flex-end' }}><InjectDeliveryMethod method={inject.delivery_method} /></Box>
+          </Stack></Collapse>
+        </Stack></Paper>})}
         {findingsSelected && <>
           <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2 }}>
             <TextField size="small" placeholder="Search by type, topic, observation, recommendation, or author" value={findingSearch} onChange={(event) => setFindingSearch(event.target.value)} slotProps={{ htmlInput: { 'aria-label': 'Search findings' }, input: { startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> } }} sx={{ flexGrow: 1, minWidth: { sm: 240 } }} />
@@ -258,7 +265,7 @@ export function ExerciseRun({ exerciseId }: { exerciseId: string }) {
           <Stack spacing={2} sx={{ maxHeight: { xs: 360, lg: "55vh" }, overflowY: "auto" }}>
           {messages.length === 0 && <Typography color="text.secondary">No messages yet.</Typography>}
           {messages.map((message) => <Paper key={message.id} variant="outlined" sx={{ p: 2 }}><Stack spacing={1}>
-            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}><Typography variant="subtitle2">{message.author_name}</Typography><Typography variant="caption" color="text.secondary">{new Date(message.created_at).toLocaleString()}</Typography></Stack>
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}><Typography variant="subtitle2">{message.author_name}</Typography><Typography variant="caption" color="text.secondary">{new Date(message.created_at).toLocaleString(undefined, { hourCycle: 'h23' })}</Typography></Stack>
             {editing === message.id ? <><TextField multiline value={editText} onChange={(event) => setEditText(event.target.value)} slotProps={{ htmlInput: { maxLength: 10000 } }} /><Stack direction="row"><Button disabled={!editText.trim()} onClick={() => void changeChat('PATCH', `${url}chat/${message.id}/`, editText).then((ok) => { if (ok) setEditing('') })}>Save</Button><Button onClick={() => setEditing('')}>Cancel</Button></Stack></> : <><Typography sx={{ whiteSpace: 'pre-wrap' }}>{message.text}</Typography>{facilitator && <Stack direction="row"><Button onClick={() => { setEditing(message.id); setEditText(message.text) }}>Edit</Button><Button onClick={() => { if (window.confirm('Delete this message?')) void changeChat('DELETE', `${url}chat/${message.id}/`) }}>Delete</Button></Stack>}</>}
           </Stack></Paper>)}
           </Stack>
@@ -272,11 +279,6 @@ export function ExerciseRun({ exerciseId }: { exerciseId: string }) {
           <DialogContent><Stack spacing={2} sx={{ pt: 1 }}>{error && <Alert severity="error">{error}</Alert>}<TextField select label="Type" value={finding.type} onChange={(event) => setFinding({ ...finding, type: event.target.value })}><MenuItem value="sustainment">Sustainment</MenuItem><MenuItem value="improvement">Improvement</MenuItem></TextField><TextField select required label="Topic" value={finding.topic} onChange={(event) => setFinding({ ...finding, topic: event.target.value })}>{findingTopicOptions.map((topic) => <MenuItem key={topic} value={topic}>{topic}</MenuItem>)}</TextField><TextField required multiline label="Observation" value={finding.observation} onChange={(event) => setFinding({ ...finding, observation: event.target.value })} /><TextField required multiline label="Recommendation" value={finding.recommendation} onChange={(event) => setFinding({ ...finding, recommendation: event.target.value })} /></Stack></DialogContent>
           <DialogActions sx={{ justifyContent: 'flex-start' }}><Button disabled={saving || !finding.topic.trim() || !finding.observation.trim() || !finding.recommendation.trim()} type="submit" variant="contained">Save</Button><Button color="inherit" disabled={saving} onClick={() => setFindingOpen(false)}>Cancel</Button></DialogActions>
         </Box>
-      </Dialog>
-      <Dialog open={facilitatorOpen} onClose={() => setFacilitatorOpen(false)} fullWidth maxWidth="sm" aria-labelledby="facilitator-dialog-title">
-        <DialogTitle id="facilitator-dialog-title">Facilitator</DialogTitle>
-        <DialogContent>{exercise?.participants.filter((person) => person.id === exercise.facilitator_id).map((person) => <Typography key={person.id}>{person.first_name} {person.last_name}</Typography>)}{!exercise?.participants.some((person) => person.id === exercise.facilitator_id) && <Typography color="text.secondary">No facilitator is assigned.</Typography>}</DialogContent>
-        <DialogActions><Button onClick={() => setFacilitatorOpen(false)}>Close</Button></DialogActions>
       </Dialog>
       <Dialog open={selectedRole !== null} onClose={() => setSelectedRole(null)} fullWidth maxWidth="sm" aria-labelledby="role-dialog-title">
         <DialogTitle id="role-dialog-title">{selectedRole ? injectRoleLabels[selectedRole] : ''}</DialogTitle>

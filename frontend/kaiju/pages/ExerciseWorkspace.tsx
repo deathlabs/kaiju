@@ -148,6 +148,7 @@ export function ExerciseWorkspace({ exerciseId, form, onClose }: ExerciseWorkspa
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState(0)
+  const [saveOverviewRequested, setSaveOverviewRequested] = useState(false)
   const [eventFormOpen, setEventFormOpen] = useState(false)
   const [editingEvent, setEditingEvent] = useState<ExerciseEvent | null>(null)
   const [eventForm, setEventForm] = useState<EventForm>({ number: '', description: '', newObjectives: [], objectiveIds: [] })
@@ -198,6 +199,13 @@ export function ExerciseWorkspace({ exerciseId, form, onClose }: ExerciseWorkspa
       setTab(0)
     }
   }, [exerciseId, loadExercise])
+
+  useEffect(() => {
+    if (tab !== 0 || !saveOverviewRequested) return
+    setSaveOverviewRequested(false)
+    const overviewForm = document.getElementById('exercise-overview-form')
+    if (overviewForm instanceof HTMLFormElement) overviewForm.requestSubmit()
+  }, [tab, saveOverviewRequested])
 
   const openEventForm = (event?: ExerciseEvent) => {
     setEditingEvent(event ?? null)
@@ -524,8 +532,8 @@ export function ExerciseWorkspace({ exerciseId, form, onClose }: ExerciseWorkspa
                         {exercise.participants.map((participant) => <TableRow key={participant.id}>
                           <TableCell>{participant.first_name} {participant.last_name}</TableCell>
                           <TableCell><Box sx={{ display: 'inline-grid', maxWidth: '100%', '& > *': { gridArea: '1 / 1' } }}>
-                            {Object.values(participantRoleLabels).map((label) => <Box aria-hidden key={label} sx={{ visibility: 'hidden', whiteSpace: 'nowrap', pl: '14px', pr: '32px' }}>{label}</Box>)}
-                            <Select disabled={updatingParticipantId !== null} inputProps={{ 'aria-label': `Role for ${participant.first_name} ${participant.last_name}` }} onChange={(event) => void updateParticipantRole(participant, event.target.value as ParticipantRole)} size="small" sx={{ '& .MuiOutlinedInput-notchedOutline': { border: 0 }, '& .MuiSelect-select:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: -2 } }} value={participant.role}>{(Object.keys(participantRoleLabels) as ParticipantRole[]).map((role) => <MenuItem key={role} value={role}>{participantRoleLabels[role]}</MenuItem>)}</Select>
+                            {Object.values(participantRoleLabels).map((label) => <Box aria-hidden key={label} sx={{ visibility: 'hidden', whiteSpace: 'nowrap', pr: '56px' }}>{label}</Box>)}
+                            <Select disabled={updatingParticipantId !== null} inputProps={{ 'aria-label': `Role for ${participant.first_name} ${participant.last_name}` }} onChange={(event) => void updateParticipantRole(participant, event.target.value as ParticipantRole)} size="small" sx={{ width: '100%', minWidth: 0, '& .MuiSelect-select': { pl: 0 }, '& .MuiOutlinedInput-notchedOutline': { border: 0 }, '& .MuiSelect-select:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: -2 } }} value={participant.role}>{(Object.keys(participantRoleLabels) as ParticipantRole[]).map((role) => <MenuItem key={role} value={role}>{participantRoleLabels[role]}</MenuItem>)}</Select>
                           </Box></TableCell>
                           <TableCell>{participant.email || '—'}</TableCell>
                           <TableCell><IconButton aria-label={`Remove ${participant.first_name} ${participant.last_name}`} color="error" onClick={() => void deleteParticipant(participant)}><DeleteIcon /></IconButton></TableCell>
@@ -552,7 +560,7 @@ export function ExerciseWorkspace({ exerciseId, form, onClose }: ExerciseWorkspa
                         <Table size="small" sx={{ width: '100%', minWidth: 650 }}>
                           <TableHead><TableRow><TableCell sx={{ width: '1%', whiteSpace: 'nowrap' }}>Inject ID</TableCell><TableCell sx={{ width: '1%', whiteSpace: 'nowrap' }}>Scheduled</TableCell><TableCell sx={{ width: '1%', whiteSpace: 'nowrap' }}>Method</TableCell><TableCell>From</TableCell><TableCell>To</TableCell><TableCell /></TableRow></TableHead>
                           <TableBody>
-                            {event.injects.map((inject, injectIndex) => <TableRow key={inject.id} hover onClick={() => openInjectForm(event, inject)} sx={{ cursor: 'pointer' }}><TableCell sx={{ width: '1%', whiteSpace: 'nowrap' }}>{inject.number}</TableCell><TableCell sx={{ width: '1%', whiteSpace: 'nowrap' }}>{new Date(inject.scheduled_start_time).toLocaleString()}</TableCell><TableCell sx={{ width: '1%', whiteSpace: 'nowrap' }}><InjectDeliveryMethod method={inject.delivery_method} /></TableCell><TableCell>{injectRoleLabels[inject.sender]}</TableCell><TableCell>{injectRoleLabels[inject.recipient]}</TableCell><TableCell align="right" onClick={(clickEvent) => clickEvent.stopPropagation()} sx={{ position: 'sticky', right: 0, zIndex: 1, backgroundColor: 'background.paper', whiteSpace: 'nowrap', width: '1%' }}><IconButton aria-label={`Move inject ${inject.number} up`} disabled={reordering || injectIndex === 0} onClick={() => void reorderInjects(event, injectIndex, injectIndex - 1)}><ArrowUpwardIcon /></IconButton><IconButton aria-label={`Move inject ${inject.number} down`} disabled={reordering || injectIndex === event.injects.length - 1} onClick={() => void reorderInjects(event, injectIndex, injectIndex + 1)}><ArrowDownwardIcon /></IconButton><IconButton aria-label={`Edit inject ${inject.number}`} onClick={() => openInjectForm(event, inject)}><EditIcon /></IconButton><IconButton aria-label={`Delete inject ${inject.number}`} color="error" onClick={() => void deleteInject(event, inject)}><DeleteIcon /></IconButton></TableCell></TableRow>)}
+                            {event.injects.map((inject, injectIndex) => <TableRow key={inject.id} hover onClick={() => openInjectForm(event, inject)} sx={{ cursor: 'pointer' }}><TableCell sx={{ width: '1%', whiteSpace: 'nowrap' }}>{inject.number}</TableCell><TableCell sx={{ width: '1%', whiteSpace: 'nowrap' }}>{new Date(inject.scheduled_start_time).toLocaleString(undefined, { hourCycle: 'h23' })}</TableCell><TableCell sx={{ width: '1%', whiteSpace: 'nowrap' }}><InjectDeliveryMethod method={inject.delivery_method} /></TableCell><TableCell>{injectRoleLabels[inject.sender]}</TableCell><TableCell>{injectRoleLabels[inject.recipient]}</TableCell><TableCell align="right" onClick={(clickEvent) => clickEvent.stopPropagation()} sx={{ position: 'sticky', right: 0, zIndex: 1, backgroundColor: 'background.paper', whiteSpace: 'nowrap', width: '1%' }}><IconButton aria-label={`Move inject ${inject.number} up`} disabled={reordering || injectIndex === 0} onClick={() => void reorderInjects(event, injectIndex, injectIndex - 1)}><ArrowUpwardIcon /></IconButton><IconButton aria-label={`Move inject ${inject.number} down`} disabled={reordering || injectIndex === event.injects.length - 1} onClick={() => void reorderInjects(event, injectIndex, injectIndex + 1)}><ArrowDownwardIcon /></IconButton><IconButton aria-label={`Edit inject ${inject.number}`} onClick={() => openInjectForm(event, inject)}><EditIcon /></IconButton><IconButton aria-label={`Delete inject ${inject.number}`} color="error" onClick={() => void deleteInject(event, inject)}><DeleteIcon /></IconButton></TableCell></TableRow>)}
                             {event.injects.length === 0 && <TableRow><TableCell colSpan={6}>No injects have been added.</TableCell></TableRow>}
                           </TableBody>
                         </Table>
@@ -564,7 +572,7 @@ export function ExerciseWorkspace({ exerciseId, form, onClose }: ExerciseWorkspa
             </>
           ) : null}
         </DialogContent>
-        <DialogActions><Button color="inherit" onClick={onClose}>Cancel</Button></DialogActions>
+        <DialogActions sx={{ justifyContent: 'space-between', px: 3, pb: 3 }}><Button variant="contained" disabled={!form || loading || saving || reordering || updatingParticipantId !== null} onClick={() => { setSaveOverviewRequested(true); setTab(0) }}>Save</Button><Button color="inherit" onClick={onClose}>Cancel</Button></DialogActions>
           </>
         )}
       </Dialog>

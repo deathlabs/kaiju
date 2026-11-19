@@ -243,6 +243,7 @@ class ParticipantSummarySchema(Schema):
     id: UUID
     first_name: str
     last_name: str
+    email: EmailStr | None = None
     role: Participant.Role
 
 
