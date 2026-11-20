@@ -158,8 +158,7 @@ class Event(models.Model):
 
 class Inject(models.Model):
     class DeliveryMethod(models.TextChoices):
-        INDEX_CARD = "index_card"
-        PHONE_CALL = "phone_call"
+        VOICEMAIL = "voicemail"
         EMAIL = "email"
         CHAT_MESSAGE = "chat_message"
 

@@ -26,10 +26,10 @@ Review the root [`README.md`](https://github.com/deathlabs/kaiju/blob/main/READM
 Install the backend and frontend dependencies before you start Kaiju.
 
 ```bash
-cd backend/kaiju && uv sync --locked
-cd ../../frontend/kaiju && npm ci
-cd ../..
+make setup
 ```
+
+The target installs Ruff. It also runs `uv sync --locked` and `npm ci`.
 
 Start the local development stack.
 

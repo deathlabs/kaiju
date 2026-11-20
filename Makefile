@@ -23,6 +23,7 @@ UDS_BUNDLE := uds-bundle-$(APP)-$(ARCHITECTURE)-$(APP_VERSION).tar.zst
 
 # Set local development paths.
 BACKEND_BUILD_CONTEXT := backend
+BACKEND_SOURCE_DIR := $(BACKEND_BUILD_CONTEXT)/$(APP)
 FRONTEND_BUILD_CONTEXT := frontend
 FRONTEND_SOURCE_DIR := $(FRONTEND_BUILD_CONTEXT)/$(APP)
 DESIGN_FILE := ../DESIGN.md
@@ -46,6 +47,18 @@ FRONTEND_VEX ?= frontend/vex.json
 # Security scanner configurations.
 SEMGREP_CONFIG ?= auto
 GRYPE_FAILURE_THRESHOLD ?= medium
+
+# ---------------------------------------------------------
+# Set up the local development environment.
+# ---------------------------------------------------------
+
+.PHONY: setup
+.SILENT: setup
+
+setup:
+	[ -f "backend/.env" ] || cp "backend/.env.example" "backend/.env"
+	[ -f "database/.env" ] || cp "database/.env.example" "database/.env"
+	scripts/setup.sh "$(BACKEND_SOURCE_DIR)" "$(FRONTEND_SOURCE_DIR)"
 
 # ---------------------------------------------------------
 # Run Zensical to serve documentation locally.

@@ -1,13 +1,16 @@
 import AddIcon from '@mui/icons-material/Add'
+import ChatIcon from '@mui/icons-material/Chat'
+import EmailIcon from '@mui/icons-material/Email'
 import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import LockIcon from '@mui/icons-material/Lock'
+import PhoneIcon from '@mui/icons-material/Phone'
 import SearchIcon from '@mui/icons-material/Search'
 import { injectRoleLabels, type InjectRole } from './injectRoles'
-import { InjectDeliveryMethod, type DeliveryMethod } from './InjectDeliveryMethod'
+import { deliveryMethodLabels, InjectDeliveryMethod, type DeliveryMethod } from './InjectDeliveryMethod'
 import { DeathlabsPageHeader } from '../components/DeathlabsPageHeader'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { Alert, Box, Button, Checkbox, Chip, CircularProgress, Collapse, FormControl, FormControlLabel, Dialog, DialogActions, DialogContent, DialogTitle, Divider, IconButton, InputAdornment, InputLabel, Link, ListItemText, MenuItem, Paper, Select, Stack, Switch, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TableSortLabel, Tabs, TextField, Tooltip, Typography } from '@mui/material'
+import { Alert, Badge, Box, Button, Checkbox, Chip, CircularProgress, Collapse, FormControl, FormControlLabel, Dialog, DialogActions, DialogContent, DialogTitle, Divider, IconButton, InputAdornment, InputLabel, Link, ListItemText, MenuItem, Paper, Select, Stack, Switch, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TableSortLabel, Tabs, TextField, Tooltip, Typography } from '@mui/material'
 
 type ParticipantRole = InjectRole | 'facilitator'
 interface Participant { id: string; first_name: string; last_name: string; email: string | null; role: ParticipantRole }
@@ -31,7 +34,6 @@ const stakeholderRoleLabels: Partial<Record<InjectRole, string>> = {
 }
 
 export function ExerciseRun({ exerciseId }: { exerciseId: string }) {
-  const showChat = false
   const [selectedObjective, setSelectedObjective] = useState<Objective | null>(null)
   const [selectedRole, setSelectedRole] = useState<InjectRole | null>(null)
   const [selectedEventId, setSelectedEventId] = useState<string | null>('introduction')
@@ -45,8 +47,8 @@ export function ExerciseRun({ exerciseId }: { exerciseId: string }) {
   const [sendingChat, setSendingChat] = useState(false)
   const [replyTo, setReplyTo] = useState('')
   const [collapsedInjectIds, setCollapsedInjectIds] = useState<string[]>([])
-  const [replyType, setReplyType] = useState<'response' | 'question'>('response')
   const [replyText, setReplyText] = useState('')
+  const [notificationMethod, setNotificationMethod] = useState<DeliveryMethod | null>(null)
   const [findingOpen, setFindingOpen] = useState(false)
   const [findingSearch, setFindingSearch] = useState('')
   const [findingTypes, setFindingTypes] = useState<string[]>([])
@@ -73,13 +75,12 @@ export function ExerciseRun({ exerciseId }: { exerciseId: string }) {
     return () => window.clearInterval(timer)
   }, [load])
   useEffect(() => {
-    if (!showChat) return
     setMessages([])
     const source = new EventSource(`${url}chat/stream/`)
     source.onmessage = (event) => { setMessages(JSON.parse(event.data) as ChatMessage[]); setChatError(null) }
     source.onerror = () => setChatError('Chat disconnected. Reconnecting…')
     return () => source.close()
-  }, [url, showChat])
+  }, [url])
   const changeChat = async (method: string, path: string, text?: string) => {
     try {
       const result = await fetch(path, { method, headers: { 'Content-Type': 'application/json' }, body: text === undefined ? undefined : JSON.stringify({ text }) })
@@ -105,6 +106,12 @@ export function ExerciseRun({ exerciseId }: { exerciseId: string }) {
   const findingsSelected = selectedEventId === 'findings'
   const selectedEvent = introductionSelected || findingsSelected ? undefined : selectableEvents.find((event) => event.id === selectedEventId) ?? selectableEvents[0]
   const sent = (selectedEvent?.injects ?? []).map((inject) => ({ event: selectedEvent!, inject }))
+  const notifications = participant ? (exercise?.events ?? []).flatMap((event) => event.injects
+    .filter((inject) => inject.is_visible && (facilitator || inject.recipient === participant.role))
+    .map((inject) => ({ event, inject }))) : []
+  const notificationCounts: Record<DeliveryMethod, number> = { voicemail: 0, email: 0, chat_message: 0 }
+  notifications.forEach(({ inject }) => { notificationCounts[inject.delivery_method] += 1 })
+  const selectedNotifications = notificationMethod ? notifications.filter(({ inject }) => inject.delivery_method === notificationMethod) : []
   const filteredFindings = (exercise?.findings ?? []).filter((item) => {
     const author = findingAuthor(item)
     return (!findingTypes.length || findingTypes.includes(item.type)) && (!findingTopics.length || findingTopics.includes(item.topic)) && [item.type, item.topic, item.observation, item.recommendation, author].join(' ').toLocaleLowerCase().includes(findingSearch.trim().toLocaleLowerCase())
@@ -138,8 +145,8 @@ export function ExerciseRun({ exerciseId }: { exerciseId: string }) {
   const sendReply = async (event: FormEvent, eventId: string, injectId: string) => {
     event.preventDefault()
     if (!replyText.trim()) return
-    if (await post(`${url}events/${eventId}/injects/${injectId}/cards/`, { type: replyType, text: replyText.trim() })) {
-      setReplyText(''); setReplyTo(''); setReplyType('response')
+    if (await post(`${url}events/${eventId}/injects/${injectId}/cards/`, { type: 'response', text: replyText.trim() })) {
+      setReplyText(''); setReplyTo('')
     }
   }
   const saveFinding = async (event: FormEvent) => {
@@ -150,7 +157,7 @@ export function ExerciseRun({ exerciseId }: { exerciseId: string }) {
       setFindingOpen(false)
     }
   }
-  return <Stack spacing={3}>
+  return <Stack spacing={3} sx={{ pb: 10 }}>
       <Box sx={{ display: 'grid', gridTemplateAreas: '"breadcrumbs action"', gridTemplateColumns: 'minmax(0, 1fr) auto', alignItems: 'center', gap: 2 }}>
         <Box component="nav" aria-label="Breadcrumb" sx={{ gridArea: 'breadcrumbs', minWidth: 0, display: 'flex', alignItems: 'baseline', gap: 1, flexWrap: 'wrap' }}>
           <DeathlabsPageHeader gutterBottom={false}><Link href="#exercises" color="inherit" underline="hover">Exercises</Link></DeathlabsPageHeader>
@@ -163,7 +170,7 @@ export function ExerciseRun({ exerciseId }: { exerciseId: string }) {
       {error && <Alert severity="error" action={<Button color="inherit" onClick={() => void load()}>Retry</Button>}>{error}</Alert>}
       {loading && <Box sx={{ textAlign: 'center', py: 5 }}><CircularProgress /></Box>}
       {exercise && <>
-        <Box sx={{ display: 'grid', gridTemplateColumns: showChat ? { xs: 'minmax(0, 1fr)', md: 'minmax(0, 1fr) minmax(0, 1fr)' } : 'minmax(0, 1fr)', gap: 2, alignItems: 'start' }}>
+        <Box>
         <Box component="section" aria-label="Feed" sx={{ p: 2, minWidth: 0 }}><Stack spacing={2}>
         <Box component="section" aria-label="Exercise Timeline" sx={{ minWidth: 0, overflowX: 'auto' }}>
           <Box sx={{ overflowX: 'auto' }}><Box sx={{ width: 'max-content', minWidth: '100%' }}>
@@ -212,7 +219,9 @@ export function ExerciseRun({ exerciseId }: { exerciseId: string }) {
           </Stack>)}
           </Box></Paper>
         </Box>}
-        {selectedEvent && sent.length === 0 && <Alert severity="info">No injects have been added to this event.</Alert>}
+        {selectedEvent && <Box sx={{ display: 'grid', gridTemplateColumns: facilitator ? { xs: 'minmax(0, 1fr)', md: 'minmax(0, 1fr) minmax(0, 1fr)' } : 'minmax(0, 1fr)', gap: 2, alignItems: 'start' }}>
+        {facilitator && <Stack spacing={2}>
+        {sent.length === 0 && <Alert severity="info">No injects have been added to this event.</Alert>}
         {sent.map(({ event, inject }) => {
           const locked = !facilitator && !inject.is_visible
           const collapsed = locked || collapsedInjectIds.includes(inject.id)
@@ -225,21 +234,38 @@ export function ExerciseRun({ exerciseId }: { exerciseId: string }) {
           </Stack>
           <Collapse in={!collapsed} unmountOnExit sx={collapsed ? { mt: '0 !important' } : undefined}><Stack id={`inject-content-${inject.id}`} spacing={2}>
           <Divider />
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2 }}><Stack spacing={1}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2 }}>
+            <InjectDeliveryMethod method={inject.delivery_method} />
+            {inject.started_at && <Typography color="text.secondary" variant="caption">{new Date(inject.started_at).toLocaleString(undefined, { hourCycle: 'h23' })}</Typography>}
+          </Box>
+          <Box><Stack spacing={1}>
             <Typography><strong>From:</strong> <Link component="button" type="button" underline="hover" onClick={() => setSelectedRole(inject.sender)}>{injectRoleLabels[inject.sender]}</Link></Typography>
             <Typography><strong>To:</strong> <Link component="button" type="button" underline="hover" onClick={() => setSelectedRole(inject.recipient)}>{injectRoleLabels[inject.recipient]}</Link></Typography>
-          </Stack>{inject.started_at && <Typography color="text.secondary" variant="caption">{new Date(inject.started_at).toLocaleString(undefined, { hourCycle: 'h23' })}</Typography>}</Box>
+          </Stack></Box>
           <Typography sx={{ whiteSpace: 'pre-wrap', mt: '0 !important', '&::before': { content: '""', display: 'block', typography: 'subtitle1', height: '1lh' } }}>{inject.message}</Typography>
           {facilitator && inject.expected_response && <Typography color="text.secondary" sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>Expected response: {inject.expected_response}</Typography>}
           {facilitator && <Stack direction="row" spacing={2} sx={{ alignItems: 'center', flexWrap: 'wrap' }}><Tooltip describeChild title="Unlock or lock this inject for participants"><FormControlLabel label="Unlocked?" control={<Switch checked={inject.is_visible} disabled={saving} onChange={(e) => void post(`${url}events/${event.id}/injects/${inject.id}/`, { is_visible: e.target.checked }, 'PATCH')} />} /></Tooltip><FormControlLabel label="Resolved?" control={<Switch checked={!!inject.ended_at} disabled={saving} onChange={(e) => void post(`${url}events/${event.id}/injects/${inject.id}/`, { ended_at: e.target.checked ? new Date().toISOString() : null, ...(e.target.checked ? { is_visible: true } : {}) }, 'PATCH')} />} /></Stack>}
           {inject.started_at && <>
           {inject.responses.map((reply) => <Paper key={reply.id} variant="outlined" sx={{ p: 2, ml: { sm: 3 } }}><Stack spacing={1}><Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}><Chip size="small" label={reply.type === 'question' ? 'Question' : 'Response'} /><Typography variant="subtitle2">{reply.participant.first_name} {reply.participant.last_name}</Typography><Typography color="text.secondary" variant="caption">{new Date(reply.created_at).toLocaleString(undefined, { hourCycle: 'h23' })}</Typography></Stack><Typography sx={{ whiteSpace: 'pre-wrap' }}>{reply.text}</Typography></Stack></Paper>)}
-          {replyTo !== inject.id && <Button sx={{ alignSelf: 'flex-start' }} onClick={() => { setReplyTo(inject.id); setReplyText(''); setReplyType('response') }}>Reply to card</Button>}
-          {replyTo === inject.id && <Box component="form" onSubmit={(e) => void sendReply(e, event.id, inject.id)}><Stack spacing={2}><TextField select label="Card type" value={replyType} onChange={(e) => setReplyType(e.target.value as 'response' | 'question')}><MenuItem value="response">Response</MenuItem><MenuItem value="question">Question</MenuItem></TextField><TextField required multiline minRows={2} label="Message" value={replyText} onChange={(e) => setReplyText(e.target.value)} /><Stack direction="row" spacing={1}><Button type="submit" variant="contained" disabled={saving || !replyText.trim()}>Send reply</Button><Button onClick={() => setReplyTo('')}>Cancel</Button></Stack></Stack></Box>}
+          {replyTo !== inject.id && <Button variant="contained" sx={{ alignSelf: 'flex-start' }} onClick={() => { setReplyTo(inject.id); setReplyText('') }}>Reply</Button>}
+          {replyTo === inject.id && <Box component="form" onSubmit={(e) => void sendReply(e, event.id, inject.id)}><Stack spacing={2}><TextField required multiline minRows={2} label="Message" value={replyText} onChange={(e) => setReplyText(e.target.value)} /><Stack direction="row" spacing={1}><Button type="submit" variant="contained" disabled={saving || !replyText.trim()}>Send reply</Button><Button onClick={() => setReplyTo('')}>Cancel</Button></Stack></Stack></Box>}
           </>}
-          <Box sx={{ alignSelf: 'flex-end' }}><InjectDeliveryMethod method={inject.delivery_method} /></Box>
           </Stack></Collapse>
         </Stack></Paper>})}
+        </Stack>}
+        <Paper component="section" aria-labelledby="exercise-chat-heading" variant="outlined" sx={{ p: 2, minWidth: 0 }}><Stack spacing={2}>
+          <Typography id="exercise-chat-heading" variant="h6">Chat</Typography>
+          {chatError && <Alert severity="warning">{chatError}</Alert>}
+          <Stack spacing={2} sx={{ maxHeight: { xs: 360, lg: "55vh" }, overflowY: "auto" }}>
+          {messages.length === 0 && <Typography color="text.secondary">No messages yet.</Typography>}
+          {messages.map((message) => <Paper key={message.id} variant="outlined" sx={{ p: 2 }}><Stack spacing={1}>
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}><Typography variant="subtitle2">{message.author_name}</Typography><Typography variant="caption" color="text.secondary">{new Date(message.created_at).toLocaleString(undefined, { hourCycle: 'h23' })}</Typography></Stack>
+            {editing === message.id ? <><TextField multiline value={editText} onChange={(event) => setEditText(event.target.value)} slotProps={{ htmlInput: { maxLength: 10000 } }} /><Stack direction="row"><Button disabled={!editText.trim()} onClick={() => void changeChat('PATCH', `${url}chat/${message.id}/`, editText).then((ok) => { if (ok) setEditing('') })}>Save</Button><Button onClick={() => setEditing('')}>Cancel</Button></Stack></> : <><Typography sx={{ whiteSpace: 'pre-wrap' }}>{message.text}</Typography>{facilitator && <Stack direction="row"><Button onClick={() => { setEditing(message.id); setEditText(message.text) }}>Edit</Button><Button onClick={() => { if (window.confirm('Delete this message?')) void changeChat('DELETE', `${url}chat/${message.id}/`) }}>Delete</Button></Stack>}</>}
+          </Stack></Paper>)}
+          </Stack>
+          <Box component="form" onSubmit={(event: FormEvent) => { event.preventDefault(); void sendChat() }}><Stack spacing={1}><TextField label="Send a message" multiline value={chatText} onChange={(event) => setChatText(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void sendChat() } }} helperText="Press Enter to send or Shift+Enter for a new line." slotProps={{ htmlInput: { maxLength: 10000 } }} /><Button type="submit" variant="contained" disabled={!chatText.trim() || sendingChat} sx={{ alignSelf: 'flex-start' }}>{sendingChat ? 'Sending…' : 'Send message'}</Button></Stack></Box>
+        </Stack></Paper>
+        </Box>}
         {findingsSelected && <>
           <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2 }}>
             <TextField size="small" placeholder="Search by type, topic, observation, recommendation, or author" value={findingSearch} onChange={(event) => setFindingSearch(event.target.value)} slotProps={{ htmlInput: { 'aria-label': 'Search findings' }, input: { startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> } }} sx={{ flexGrow: 1, minWidth: { sm: 240 } }} />
@@ -259,18 +285,6 @@ export function ExerciseRun({ exerciseId }: { exerciseId: string }) {
         </>}
         </Stack></Box>
         </Stack></Box>
-        {showChat && <Paper component="section" aria-labelledby="exercise-chat-heading" variant="outlined" sx={{ p: 2, minWidth: 0 }}><Stack spacing={2}>
-          <Typography id="exercise-chat-heading" variant="h6">Chat</Typography>
-          {chatError && <Alert severity="warning">{chatError}</Alert>}
-          <Stack spacing={2} sx={{ maxHeight: { xs: 360, lg: "55vh" }, overflowY: "auto" }}>
-          {messages.length === 0 && <Typography color="text.secondary">No messages yet.</Typography>}
-          {messages.map((message) => <Paper key={message.id} variant="outlined" sx={{ p: 2 }}><Stack spacing={1}>
-            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}><Typography variant="subtitle2">{message.author_name}</Typography><Typography variant="caption" color="text.secondary">{new Date(message.created_at).toLocaleString(undefined, { hourCycle: 'h23' })}</Typography></Stack>
-            {editing === message.id ? <><TextField multiline value={editText} onChange={(event) => setEditText(event.target.value)} slotProps={{ htmlInput: { maxLength: 10000 } }} /><Stack direction="row"><Button disabled={!editText.trim()} onClick={() => void changeChat('PATCH', `${url}chat/${message.id}/`, editText).then((ok) => { if (ok) setEditing('') })}>Save</Button><Button onClick={() => setEditing('')}>Cancel</Button></Stack></> : <><Typography sx={{ whiteSpace: 'pre-wrap' }}>{message.text}</Typography>{facilitator && <Stack direction="row"><Button onClick={() => { setEditing(message.id); setEditText(message.text) }}>Edit</Button><Button onClick={() => { if (window.confirm('Delete this message?')) void changeChat('DELETE', `${url}chat/${message.id}/`) }}>Delete</Button></Stack>}</>}
-          </Stack></Paper>)}
-          </Stack>
-          <Box component="form" onSubmit={(event: FormEvent) => { event.preventDefault(); void sendChat() }}><Stack spacing={1}><TextField label="Message everyone" multiline value={chatText} onChange={(event) => setChatText(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void sendChat() } }} helperText="Press Enter to send or Shift+Enter for a new line." slotProps={{ htmlInput: { maxLength: 10000 } }} /><Button type="submit" variant="contained" disabled={!chatText.trim() || sendingChat} sx={{ alignSelf: 'flex-start' }}>{sendingChat ? 'Sending…' : 'Send message'}</Button></Stack></Box>
-        </Stack></Paper>}
         </Box>
       </>}
       <Dialog open={findingOpen} onClose={() => { if (!saving) setFindingOpen(false) }} fullWidth maxWidth="sm" aria-labelledby="finding-dialog-title">
@@ -292,5 +306,30 @@ export function ExerciseRun({ exerciseId }: { exerciseId: string }) {
         <DialogContent><Typography sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{selectedObjective?.description}</Typography></DialogContent>
         <DialogActions><Button onClick={() => setSelectedObjective(null)}>Close</Button></DialogActions>
       </Dialog>
+      <Dialog open={notificationMethod !== null} onClose={() => { setNotificationMethod(null); setReplyTo('') }} fullWidth maxWidth="md" aria-labelledby="notification-dialog-title">
+        <DialogTitle id="notification-dialog-title">{notificationMethod ? `${deliveryMethodLabels[notificationMethod]} notifications` : 'Notifications'}</DialogTitle>
+        <DialogContent><Stack spacing={2} sx={{ pt: 1 }}>
+          {selectedNotifications.length === 0 && <Typography color="text.secondary">No notifications.</Typography>}
+          {selectedNotifications.map(({ event, inject }) => <Paper key={inject.id} variant="outlined" sx={{ p: 2 }}><Stack spacing={2}>
+            <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+              <InjectDeliveryMethod method={inject.delivery_method} />
+              <Typography variant="subtitle1">Event {event.number}, Inject {inject.number}</Typography>
+              <Box sx={{ flexGrow: 1 }} />
+              {inject.started_at && <Typography color="text.secondary" variant="caption">{new Date(inject.started_at).toLocaleString(undefined, { hourCycle: 'h23' })}</Typography>}
+            </Stack>
+            <Box><Typography><strong>From:</strong> <Link component="button" type="button" underline="hover" onClick={() => setSelectedRole(inject.sender)}>{injectRoleLabels[inject.sender]}</Link></Typography><Typography><strong>To:</strong> <Link component="button" type="button" underline="hover" onClick={() => setSelectedRole(inject.recipient)}>{injectRoleLabels[inject.recipient]}</Link></Typography></Box>
+            <Typography sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{inject.message}</Typography>
+            {inject.responses.map((reply) => <Paper key={reply.id} variant="outlined" sx={{ p: 2, ml: { sm: 3 } }}><Stack spacing={1}><Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}><Chip size="small" label={reply.type === 'question' ? 'Question' : 'Response'} /><Typography variant="subtitle2">{reply.participant.first_name} {reply.participant.last_name}</Typography><Typography color="text.secondary" variant="caption">{new Date(reply.created_at).toLocaleString(undefined, { hourCycle: 'h23' })}</Typography></Stack><Typography sx={{ whiteSpace: 'pre-wrap' }}>{reply.text}</Typography></Stack></Paper>)}
+            {replyTo !== inject.id && <Button variant="contained" sx={{ alignSelf: 'flex-start' }} onClick={() => { setReplyTo(inject.id); setReplyText('') }}>Reply</Button>}
+            {replyTo === inject.id && <Box component="form" onSubmit={(submitEvent) => void sendReply(submitEvent, event.id, inject.id)}><Stack spacing={2}><TextField required multiline minRows={2} label="Message" value={replyText} onChange={(changeEvent) => setReplyText(changeEvent.target.value)} /><Stack direction="row" spacing={1}><Button type="submit" variant="contained" disabled={saving || !replyText.trim()}>Send reply</Button><Button onClick={() => setReplyTo('')}>Cancel</Button></Stack></Stack></Box>}
+          </Stack></Paper>)}
+        </Stack></DialogContent>
+        <DialogActions><Button onClick={() => { setNotificationMethod(null); setReplyTo('') }}>Close</Button></DialogActions>
+      </Dialog>
+      {participant && <Paper component="nav" aria-label="Exercise notifications" elevation={8} sx={{ position: 'fixed', bottom: 24, left: '50%', zIndex: (theme) => theme.zIndex.appBar, display: 'flex', gap: 0.5, p: 0.75, border: 1, borderColor: 'divider', borderRadius: 999, transform: 'translateX(-50%)' }}>
+        <Tooltip title="Voicemail"><IconButton aria-label={`${notificationCounts.voicemail} voicemail notifications`} onClick={() => setNotificationMethod('voicemail')}><Badge badgeContent={notificationCounts.voicemail} color="error"><PhoneIcon /></Badge></IconButton></Tooltip>
+        <Tooltip title="Email"><IconButton aria-label={`${notificationCounts.email} email notifications`} onClick={() => setNotificationMethod('email')}><Badge badgeContent={notificationCounts.email} color="error"><EmailIcon /></Badge></IconButton></Tooltip>
+        <Tooltip title="Chat message"><IconButton aria-label={`${notificationCounts.chat_message} chat message notifications`} onClick={() => setNotificationMethod('chat_message')}><Badge badgeContent={notificationCounts.chat_message} color="error"><ChatIcon /></Badge></IconButton></Tooltip>
+      </Paper>}
     </Stack>
 }
